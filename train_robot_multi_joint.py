@@ -51,7 +51,7 @@ scheduler = DDIMScheduler(num_train_timesteps=num_train_timesteps)
 
 # Define dimensions based on the sine wave generation
 trajectory_dim = 12  # We have two legs with 6 joints each
-hidden_dim = 512
+hidden_dim = 2048 * 2
 
 # Read the robot data from the CSV file
 data = pd.read_csv('joint_commands.csv')
@@ -104,8 +104,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 real_trajectories = real_trajectories.to(device)
 time = time.to(device)
 
-batch_size = 500
-epochs = 4000
+batch_size = 64
+epochs = 200
 lr = 1e-4
 
 # Initialize the model and optimizer
