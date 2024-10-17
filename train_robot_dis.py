@@ -61,13 +61,26 @@ hidden_dim = 128
 num_layers = 1
 num_heads = 4
 num_bins = 512
-sequence_length = 30
+sequence_length = 100
 
 # Read the robot data from the CSV file
 data = pd.read_csv('joint_commands.csv')
 
 # Extract the joint command data all joints, and drop the time column
-joints = ["LKnee","RKnee"]
+joints = [
+    "LHipYaw",
+    "RHipYaw",
+    "LHipRoll",
+    "RHipRoll",
+    "LHipPitch",
+    "RHipPitch",
+    "LKnee",
+    "RKnee",
+    "LAnklePitch",
+    "RAnklePitch",
+    "LAnkleRoll",
+    "RAnkleRoll",
+]
 data = data[joints]
 trajectory_dim = len(joints)
 
@@ -92,24 +105,14 @@ real_trajectories = torch.tensor(np.array([data[i:i + timesteps].values for i in
 num_samples = real_trajectories.size(0)
 real_trajectories = real_trajectories[torch.randperm(real_trajectories.size(0))]
 
-# Compute velocities (finite differences) and discretize them into 30 bins
-def compute_velocity(trajectories):
-    velocities = torch.diff(trajectories, dim=1)
-    return velocities
-
-def discretize_velocity(velocities, num_bins):
-    bin_edges = torch.linspace(-0.25, 0.25, num_bins + 1).to(device)
-    binned_velocities = torch.bucketize(velocities, bin_edges)
-    return binned_velocities, bin_edges
-
-# Plot the first 5 sine wave trajectories
+# Subplot each joint, showing the first n batches
+n = 1
 plt.figure(figsize=(12, 6))
-for i in range(5):
-    plt.plot(time.cpu(), real_trajectories[i].cpu(), label=f"Trajectory {i + 1}")
-plt.title("Sine Wave Trajectories")
-plt.xlabel("Time")
-plt.ylabel("Amplitude")
-plt.legend()
+for i in range(trajectory_dim):
+    plt.subplot(3, 4, i + 1)
+    plt.plot(real_trajectories[:n, :, i].T)
+    plt.title(f"Joint {data.columns[i]}")
+plt.suptitle("LKnee Trajectories")
 plt.show()
 
 # Initialize the Transformer model and optimizer, and move model to device
@@ -122,7 +125,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 batch_size = 32
 
 # Training loop
-for epoch in tqdm(range(10)):  # Number of training epochs
+for epoch in tqdm(range(20)):  # Number of training epochs
     for batch in range(num_samples // batch_size):
         targets = real_trajectories[batch * batch_size: (batch + 1) * batch_size].to(device)
 
@@ -138,17 +141,17 @@ for epoch in tqdm(range(10)):  # Number of training epochs
         targets_binned = targets_binned.unsqueeze(-1).to(device)
 
         # Make one-hot encoding of the binned velocities
-        binned_velocities_embedding = F.one_hot(targets_binned, num_bins).float().to(device)
+        binned_velocities_embedding = F.one_hot(targets_binned, num_bins).squeeze(3).float().to(device)
 
         # Cut and shift the input sequence for the Transformer model
-        input_seq = binned_velocities_embedding[:, :-1]
-        target_seq = targets_binned[:, 1:]
+        start_token = torch.zeros(batch_size, 1, trajectory_dim, num_bins).to(device)
+        input_seq = torch.cat([start_token, binned_velocities_embedding[:, :-1]], dim=1)
 
         # Predict the velocity bins using the Transformer model
         predicted_bins = model(input_seq)
 
         # Cross-entropy loss between predicted bins and actual velocity bins
-        loss = F.cross_entropy(predicted_bins.reshape(-1, num_bins), target_seq.reshape(-1))
+        loss = F.cross_entropy(predicted_bins.reshape(-1, num_bins), targets_binned.reshape(-1))
 
         # Backpropagation and optimization
         loss.backward()
@@ -159,7 +162,7 @@ for epoch in tqdm(range(10)):  # Number of training epochs
 
 # Sampling a new trajectory after training
 def sample_trajectory(steps=20):
-    sampled_trajectory = torch.zeros(1, 1, trajectory_dim, num_bins).to(device) + F.one_hot(torch.randint(0, num_bins, (1, 1)), num_bins).float().to(device)
+    sampled_trajectory = torch.zeros(1, 1, trajectory_dim, num_bins).to(device)
 
     probabilities = []
 
@@ -169,10 +172,10 @@ def sample_trajectory(steps=20):
         # Predict the next velocity bin using the Transformer model
         predicted_bin = model(sampled_trajectory.view(1, -1, trajectory_dim * num_bins)).view(1, -1, trajectory_dim, num_bins)
 
-        probabilities.append(predicted_bin[:, -1, 0].squeeze(0).cpu().detach().numpy())
+        probabilities.append(predicted_bin[:, -1, 0].squeeze(0).softmax(-1).cpu().detach().numpy())
 
         # Sample top bin as the next velocity
-        _, sampled_bin = torch.topk(predicted_bin, k=1, dim=-1)
+        sampled_bin = torch.multinomial(predicted_bin[:, -1].softmax(-1).squeeze(), 1, replacement=True)
 
         # Only keep the last predicted bin
         sampled_bin = sampled_bin[:, -1]
@@ -181,7 +184,7 @@ def sample_trajectory(steps=20):
         print(top_classes)
 
         # One-hot encode the sampled bin
-        sampled_bin_onehot = F.one_hot(sampled_bin, num_bins).float().to(device).squeeze(2).unsqueeze(0)
+        sampled_bin_onehot = F.one_hot(sampled_bin, num_bins).float().to(device).unsqueeze(0).unsqueeze(0)
 
         # Append the sampled bin to the trajectory
         sampled_trajectory = torch.cat([sampled_trajectory, sampled_bin_onehot], dim=1)
@@ -198,7 +201,7 @@ def sample_trajectory(steps=20):
 
 for _ in range(20):
     # Plot the sampled trajectory
-    sampled_trajectory = sample_trajectory(steps=30)
+    sampled_trajectory = sample_trajectory(steps=99)
     # Coverting the sampled trajectory to a numpy array
     sampled_trajectory = np.array(sampled_trajectory)
     # Convert back to radians
@@ -206,8 +209,8 @@ for _ in range(20):
     plt.figure(figsize=(12, 6))
     # plot the sampled trajectory for each joint in a subplot
     for j in range(trajectory_dim):
-        plt.subplot(1, 2, j + 1)
-        plt.plot(sampled_trajectory[:, 0, j, 0], label="Sampled Trajectory")
+        plt.subplot(3, 4, j + 1)
+        plt.plot(sampled_trajectory[:, j], label="Sampled Trajectory")
         # Fix limits to -pi to pi
         plt.ylim(-np.pi, np.pi)
         plt.title(f"Joint {joints[j]}")
