@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>bitbots_template_py</name>
+  <description>Template python node</description>
+  <version>0.0.0</version>
+  <license>MIT</license>
+
+  <maintainer email="info@bit-bots.de">Hamburg Bit-Bots</maintainer>
+  <author email="info@bit-bots.de">Hamburg Bit-Bots</author>
+
+  <depend>rclpy</depend>
+  <depend>generate_parameter_library</depend>
+  <depend>bitbots_docs</depend>
+
+  <export>
+    <bitbots_documentation>
+      <status>unknown</status>
+      <language>python3</language>
+    </bitbots_documentation>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
