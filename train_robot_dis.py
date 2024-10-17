@@ -60,7 +60,7 @@ class PositionalEncoding(nn.Module):
 hidden_dim = 128
 num_layers = 1
 num_heads = 4
-num_bins = 512
+num_bins = 64
 sequence_length = 100
 
 # Read the robot data from the CSV file
@@ -84,6 +84,9 @@ joints = [
 data = data[joints]
 trajectory_dim = len(joints)
 
+# Normalize the LKnee joint data (per joint) / center and scale
+data = (data - data.mean()) / data.std()
+
 # Plot the LKnee joint data
 plt.figure(figsize=(12, 6))
 plt.plot(data)
@@ -105,6 +108,10 @@ real_trajectories = torch.tensor(np.array([data[i:i + timesteps].values for i in
 num_samples = real_trajectories.size(0)
 real_trajectories = real_trajectories[torch.randperm(real_trajectories.size(0))]
 
+
+# Limit to -1 to 1
+real_trajectories = torch.tanh(real_trajectories)
+
 # Subplot each joint, showing the first n batches
 n = 1
 plt.figure(figsize=(12, 6))
@@ -122,20 +129,20 @@ summary(model, input_size=(1, 30, trajectory_dim, num_bins))
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
 # Create batches of data
-batch_size = 32
+batch_size = 16
 
 # Training loop
-for epoch in tqdm(range(20)):  # Number of training epochs
+for epoch in tqdm(range(5)):  # Number of training epochs
     for batch in range(num_samples // batch_size):
         targets = real_trajectories[batch * batch_size: (batch + 1) * batch_size].to(device)
 
         optimizer.zero_grad()
 
-        # Map -1 pi - pi to 0 - 1
-        targets_scaled = (targets + np.pi) / (2 * np.pi)
+        # Map the data to the range 0 to 1
+        targets_scaled = (targets + 1) / 2
 
         # Discretize into num_bins
-        targets_binned = (targets_scaled * num_bins).long()
+        targets_binned = (targets_scaled * (num_bins - 1)).long()
 
         # Make floating point tensors
         targets_binned = targets_binned.unsqueeze(-1).to(device)
@@ -175,7 +182,8 @@ def sample_trajectory(steps=20):
         probabilities.append(predicted_bin[:, -1, 0].squeeze(0).softmax(-1).cpu().detach().numpy())
 
         # Sample top bin as the next velocity
-        sampled_bin = torch.multinomial(predicted_bin[:, -1].softmax(-1).squeeze(), 1, replacement=True)
+        #sampled_bin = torch.multinomial(predicted_bin[:, -1].softmax(-1).squeeze(), 1, replacement=True)
+        _, sampled_bin = torch.topk(predicted_bin[:, -1].softmax(-1).squeeze(), 1)
 
         # Only keep the last predicted bin
         sampled_bin = sampled_bin[:, -1]
@@ -204,15 +212,11 @@ for _ in range(20):
     sampled_trajectory = sample_trajectory(steps=99)
     # Coverting the sampled trajectory to a numpy array
     sampled_trajectory = np.array(sampled_trajectory)
-    # Convert back to radians
-    sampled_trajectory = (sampled_trajectory / num_bins) * (2 * np.pi) - np.pi
     plt.figure(figsize=(12, 6))
     # plot the sampled trajectory for each joint in a subplot
     for j in range(trajectory_dim):
         plt.subplot(3, 4, j + 1)
         plt.plot(sampled_trajectory[:, j], label="Sampled Trajectory")
-        # Fix limits to -pi to pi
-        plt.ylim(-np.pi, np.pi)
         plt.title(f"Joint {joints[j]}")
     plt.legend()
     plt.show()
