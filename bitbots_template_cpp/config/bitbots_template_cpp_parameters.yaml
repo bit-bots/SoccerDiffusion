@@ -1,0 +1,6 @@
+bitbots_template_cpp:
+  foo: {
+    type: string,
+    default_value: "Bar",
+    description: "Dummy parameter"
+  }
