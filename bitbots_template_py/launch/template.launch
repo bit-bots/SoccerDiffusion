@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<launch>
+    <!-- Get launch params-->
+    <arg name="sim" default="false" description="true: activates simulation time, switches to simulation color settings and deactivates launching of an image provider" />
+
+    <!-- Start the template node -->
+    <node pkg="bitbots_template_py" exec="template" output="screen"></node>
+</launch>
