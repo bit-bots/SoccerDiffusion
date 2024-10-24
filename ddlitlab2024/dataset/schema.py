@@ -1,10 +1,14 @@
-from enum import Enum
-
-from sqlalchemy import create_engine, Integer, String, Float, Boolean, ForeignKey, DateTime, CheckConstraint
-from sqlalchemy.orm import relationship, sessionmaker, declarative_base, Mapped, mapped_column
-from sqlalchemy.types import LargeBinary
-from typing import List, Optional
 from datetime import datetime
+from enum import Enum
+from typing import List, Optional
+
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, Integer, String, create_engine
+from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship, sessionmaker
+from sqlalchemy.types import LargeBinary
+
+from ddlitlab2024.dataset import logger
+
+logger.info("Creating database schema")
 
 Base = declarative_base()
 
@@ -158,3 +162,5 @@ engine = create_engine("sqlite:///data.db")
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
+
+logger.info("Database schema created")
