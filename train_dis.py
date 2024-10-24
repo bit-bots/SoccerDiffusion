@@ -9,10 +9,9 @@ from tqdm import tqdm
 # Check if CUDA is available and set the device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# Define the Transformer Decoder model for velocity prediction
 class TrajectoryTransformerModel(nn.Module):
     def __init__(self, num_joints, hidden_dim, num_layers, num_heads, max_seq_len, num_bins):
-        super(TrajectoryTransformerModel, self).__init__()
+        super().__init__()
         self.embedding = nn.Linear(num_joints*num_bins, hidden_dim)
         self.positional_encoding = PositionalEncoding(hidden_dim, max_seq_len)
         self.transformer_decoder = nn.TransformerDecoder(
@@ -44,7 +43,7 @@ class TrajectoryTransformerModel(nn.Module):
 # Positional Encoding class for the Transformer
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len):
-        super(PositionalEncoding, self).__init__()
+        super().__init__()
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
