@@ -19,7 +19,7 @@ class RobotState(str, Enum):
 
     @classmethod
     def values(cls):
-        return [cls.POSITIONING, cls.PLAYING, cls.STOPPED, cls.UNKNOWN]
+        return [e.value for e in cls]
 
 
 class TeamColor(str, Enum):
@@ -36,18 +36,7 @@ class TeamColor(str, Enum):
 
     @classmethod
     def values(cls):
-        return [
-            cls.BLUE,
-            cls.RED,
-            cls.YELLOW,
-            cls.BLACK,
-            cls.WHITE,
-            cls.GREEN,
-            cls.ORANGE,
-            cls.PURPLE,
-            cls.BROWN,
-            cls.GRAY,
-        ]
+        return [e.value for e in cls]
 
 
 class Recording(Base):
@@ -125,10 +114,52 @@ class JointState(Base):
     _id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     stamp: Mapped[float] = mapped_column(Float, nullable=False)
     recording_id: Mapped[int] = mapped_column(Integer, ForeignKey("Recording._id"), nullable=False)
+    r_shoulder_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="RShoulderPitch")
+    l_shoulder_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="LShoulderPitch")
+    r_shoulder_roll: Mapped[float] = mapped_column(Float, nullable=False, name="RShoulderRoll")
+    l_shoulder_roll: Mapped[float] = mapped_column(Float, nullable=False, name="LShoulderRoll")
+    r_elbow: Mapped[float] = mapped_column(Float, nullable=False, name="RElbow")
+    l_elbow: Mapped[float] = mapped_column(Float, nullable=False, name="LElbow")
+    r_hip_yaw: Mapped[float] = mapped_column(Float, nullable=False, name="RHipYaw")
+    l_hip_yaw: Mapped[float] = mapped_column(Float, nullable=False, name="LHipYaw")
+    r_hip_roll: Mapped[float] = mapped_column(Float, nullable=False, name="RHipRoll")
+    l_hip_roll: Mapped[float] = mapped_column(Float, nullable=False, name="LHipRoll")
+    r_hip_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="RHipPitch")
+    l_hip_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="LHipPitch")
+    r_knee: Mapped[float] = mapped_column(Float, nullable=False, name="RKnee")
+    l_knee: Mapped[float] = mapped_column(Float, nullable=False, name="LKnee")
+    r_ankle_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="RAnklePitch")
+    l_ankle_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="LAnklePitch")
+    r_ankle_roll: Mapped[float] = mapped_column(Float, nullable=False, name="RAnkleRoll")
+    l_ankle_roll: Mapped[float] = mapped_column(Float, nullable=False, name="LAnkleRoll")
+    head_pan: Mapped[float] = mapped_column(Float, nullable=False, name="HeadPan")
+    head_tilt: Mapped[float] = mapped_column(Float, nullable=False, name="HeadTilt")
 
     recording: Mapped["Recording"] = relationship("Recording", back_populates="joint_states")
 
-    __table_args__ = (CheckConstraint("stamp >= 0"),)
+    __table_args__ = (
+        CheckConstraint("stamp >= 0"),
+        CheckConstraint("RShoulderPitch >= 0 AND RShoulderPitch < 2 * pi()"),
+        CheckConstraint("LShoulderPitch >= 0 AND LShoulderPitch < 2 * pi()"),
+        CheckConstraint("RShoulderRoll >= 0 AND RShoulderRoll < 2 * pi()"),
+        CheckConstraint("LShoulderRoll >= 0 AND LShoulderRoll < 2 * pi()"),
+        CheckConstraint("RElbow >= 0 AND RElbow < 2 * pi()"),
+        CheckConstraint("LElbow >= 0 AND LElbow < 2 * pi()"),
+        CheckConstraint("RHipYaw >= 0 AND RHipYaw < 2 * pi()"),
+        CheckConstraint("LHipYaw >= 0 AND LHipYaw < 2 * pi()"),
+        CheckConstraint("RHipRoll >= 0 AND RHipRoll < 2 * pi()"),
+        CheckConstraint("LHipRoll >= 0 AND LHipRoll < 2 * pi()"),
+        CheckConstraint("RHipPitch >= 0 AND RHipPitch < 2 * pi()"),
+        CheckConstraint("LHipPitch >= 0 AND LHipPitch < 2 * pi()"),
+        CheckConstraint("RKnee >= 0 AND RKnee < 2 * pi()"),
+        CheckConstraint("LKnee >= 0 AND LKnee < 2 * pi()"),
+        CheckConstraint("RAnklePitch >= 0 AND RAnklePitch < 2 * pi()"),
+        CheckConstraint("LAnklePitch >= 0 AND LAnklePitch < 2 * pi()"),
+        CheckConstraint("RAnkleRoll >= 0 AND RAnkleRoll < 2 * pi()"),
+        CheckConstraint("LAnkleRoll >= 0 AND LAnkleRoll < 2 * pi()"),
+        CheckConstraint("HeadPan >= 0 AND HeadPan < 2 * pi()"),
+        CheckConstraint("HeadTilt >= 0 AND HeadTilt < 2 * pi()"),
+    )
 
 
 class JointCommand(Base):
@@ -137,10 +168,52 @@ class JointCommand(Base):
     _id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     stamp: Mapped[float] = mapped_column(Float, nullable=False)
     recording_id: Mapped[int] = mapped_column(Integer, ForeignKey("Recording._id"), nullable=False)
+    r_shoulder_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="RShoulderPitch")
+    l_shoulder_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="LShoulderPitch")
+    r_shoulder_roll: Mapped[float] = mapped_column(Float, nullable=False, name="RShoulderRoll")
+    l_shoulder_roll: Mapped[float] = mapped_column(Float, nullable=False, name="LShoulderRoll")
+    r_elbow: Mapped[float] = mapped_column(Float, nullable=False, name="RElbow")
+    l_elbow: Mapped[float] = mapped_column(Float, nullable=False, name="LElbow")
+    r_hip_yaw: Mapped[float] = mapped_column(Float, nullable=False, name="RHipYaw")
+    l_hip_yaw: Mapped[float] = mapped_column(Float, nullable=False, name="LHipYaw")
+    r_hip_roll: Mapped[float] = mapped_column(Float, nullable=False, name="RHipRoll")
+    l_hip_roll: Mapped[float] = mapped_column(Float, nullable=False, name="LHipRoll")
+    r_hip_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="RHipPitch")
+    l_hip_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="LHipPitch")
+    r_knee: Mapped[float] = mapped_column(Float, nullable=False, name="RKnee")
+    l_knee: Mapped[float] = mapped_column(Float, nullable=False, name="LKnee")
+    r_ankle_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="RAnklePitch")
+    l_ankle_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="LAnklePitch")
+    r_ankle_roll: Mapped[float] = mapped_column(Float, nullable=False, name="RAnkleRoll")
+    l_ankle_roll: Mapped[float] = mapped_column(Float, nullable=False, name="LAnkleRoll")
+    head_pan: Mapped[float] = mapped_column(Float, nullable=False, name="HeadPan")
+    head_tilt: Mapped[float] = mapped_column(Float, nullable=False, name="HeadTilt")
 
     recording: Mapped["Recording"] = relationship("Recording", back_populates="joint_commands")
 
-    __table_args__ = (CheckConstraint("stamp >= 0"),)
+    __table_args__ = (
+        CheckConstraint("stamp >= 0"),
+        CheckConstraint("RShoulderPitch >= 0 AND RShoulderPitch < 2 * pi()"),
+        CheckConstraint("LShoulderPitch >= 0 AND LShoulderPitch < 2 * pi()"),
+        CheckConstraint("RShoulderRoll >= 0 AND RShoulderRoll < 2 * pi()"),
+        CheckConstraint("LShoulderRoll >= 0 AND LShoulderRoll < 2 * pi()"),
+        CheckConstraint("RElbow >= 0 AND RElbow < 2 * pi()"),
+        CheckConstraint("LElbow >= 0 AND LElbow < 2 * pi()"),
+        CheckConstraint("RHipYaw >= 0 AND RHipYaw < 2 * pi()"),
+        CheckConstraint("LHipYaw >= 0 AND LHipYaw < 2 * pi()"),
+        CheckConstraint("RHipRoll >= 0 AND RHipRoll < 2 * pi()"),
+        CheckConstraint("LHipRoll >= 0 AND LHipRoll < 2 * pi()"),
+        CheckConstraint("RHipPitch >= 0 AND RHipPitch < 2 * pi()"),
+        CheckConstraint("LHipPitch >= 0 AND LHipPitch < 2 * pi()"),
+        CheckConstraint("RKnee >= 0 AND RKnee < 2 * pi()"),
+        CheckConstraint("LKnee >= 0 AND LKnee < 2 * pi()"),
+        CheckConstraint("RAnklePitch >= 0 AND RAnklePitch < 2 * pi()"),
+        CheckConstraint("LAnklePitch >= 0 AND LAnklePitch < 2 * pi()"),
+        CheckConstraint("RAnkleRoll >= 0 AND RAnkleRoll < 2 * pi()"),
+        CheckConstraint("LAnkleRoll >= 0 AND LAnkleRoll < 2 * pi()"),
+        CheckConstraint("HeadPan >= 0 AND HeadPan < 2 * pi()"),
+        CheckConstraint("HeadTilt >= 0 AND HeadTilt < 2 * pi()"),
+    )
 
 
 class GameState(Base):
