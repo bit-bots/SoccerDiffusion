@@ -17,6 +17,13 @@ description = ""
 [tool.poetry.dependencies]
 python = "^3.10"
 sqlalchemy = "^2.0.36"
+torch = "^2.5.0"
+diffusers = "^0.31.0"
+matplotlib = "^3.9.2"
+pandas = "^2.2.3"
+torchinfo = "^1.8.0"
+numpy = "^2.1.2"
+tqdm = "^4.66.5"
 
 [tool.ruff]
 fix = true
