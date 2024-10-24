@@ -3,7 +3,7 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "ddlitlab"
+name = "ddlitlab2024"
 version = "0.0.1"
 readme = "README.md"
 repository = "https://github.com/bit-bots/ddlitlab2024"
@@ -13,10 +13,9 @@ authors = [
   "Joern Griepenburg",
 ]
 description = ""
-package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.12"
 sqlalchemy = "^2.0.36"
 
 [tool.ruff]
