@@ -1,11 +1,10 @@
-[tool.black]
-line-length = 120
-
 [tool.ruff]
 line-length = 120
- # Never enforce `E501` (line length violations), as black takes care of this.
-ignore = ["E501"]
+
+[tool.ruff.lint]
 # Additionally enable the following rules
+# - pyflakes (`F`)
+# - pycodestyle errors (`E`)
 # - pycodestyle warnings (`W`)
 # - flake8-bugbear warnings (`B`)
 # - isort import sorting (`I`)
