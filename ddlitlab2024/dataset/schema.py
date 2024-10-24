@@ -8,8 +8,6 @@ from sqlalchemy.types import LargeBinary
 
 from ddlitlab2024.dataset import logger
 
-logger.info("Creating database schema")
-
 Base = declarative_base()
 
 
@@ -158,9 +156,13 @@ class GameState(Base):
     __table_args__ = (CheckConstraint(state.in_(RobotState.values())),)
 
 
-engine = create_engine("sqlite:///data.db")
-Base.metadata.create_all(engine)
-Session = sessionmaker(bind=engine)
-session = Session()
+def main():
+    logger.info("Creating database schema")
+    engine = create_engine("sqlite:///data.sqlite")
+    Base.metadata.create_all(engine)
+    sessionmaker(bind=engine)()
+    logger.info("Database schema created")
 
-logger.info("Database schema created")
+
+if __name__ == "__main__":
+    main()
