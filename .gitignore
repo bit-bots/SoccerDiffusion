@@ -1,5 +1,6 @@
 env/
 *.csv
+*.sqlite
 
 # Created by .ignore support plugin (hsz.mobi)
 ### JetBrains template
