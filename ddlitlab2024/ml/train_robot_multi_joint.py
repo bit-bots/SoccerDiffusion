@@ -1,24 +1,20 @@
-import torch
-from torch import nn
-from diffusers import DDPMScheduler, DDIMScheduler
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
-from tqdm import tqdm
 import pandas as pd
+import torch
+import torch.nn.functional as F  # noqa
+from diffusers.schedulers.scheduling_ddim import DDIMScheduler
+from torch import nn
+from tqdm import tqdm
+
 
 # Define the neural network architecture to model the denoising process.
 class TrajectoryDenoisingModel(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
-        super(TrajectoryDenoisingModel, self).__init__()
-        self.joint_enc = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.LeakyReLU()
-        )
+        super().__init__()
+        self.joint_enc = nn.Sequential(nn.Linear(input_dim, hidden_dim), nn.LeakyReLU())
         self.joint_dec = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.LeakyReLU(),
-            nn.Linear(hidden_dim, output_dim)
+            nn.Linear(hidden_dim, hidden_dim), nn.LeakyReLU(), nn.Linear(hidden_dim, output_dim)
         )
         self.timestep_embedding = PositionalEncoding(hidden_dim)
 
@@ -54,10 +50,25 @@ trajectory_dim = 12  # We have two legs with 6 joints each
 hidden_dim = 2048 * 2
 
 # Read the robot data from the CSV file
-data = pd.read_csv('joint_commands.csv')
+data = pd.read_csv("joint_commands.csv")
 
 # Extract the joint command data all joints, and drop the time column
-data = data[["LHipYaw", "LHipRoll","LHipPitch","LKnee","LAnklePitch","LAnkleRoll","RHipYaw","RHipRoll","RHipPitch","RKnee","RAnklePitch","RAnkleRoll"]]
+data = data[
+    [
+        "LHipYaw",
+        "LHipRoll",
+        "LHipPitch",
+        "LKnee",
+        "LAnklePitch",
+        "LAnkleRoll",
+        "RHipYaw",
+        "RHipRoll",
+        "RHipPitch",
+        "RKnee",
+        "RAnklePitch",
+        "RAnkleRoll",
+    ]
+]
 
 # Plot the LKnee joint data
 plt.figure(figsize=(12, 6))
@@ -76,7 +87,9 @@ data = data[::3]
 # Chunk the data into sequences of 50 timesteps
 timesteps = 70
 time = torch.linspace(0, 1, timesteps).unsqueeze(-1)
-real_trajectories = torch.tensor(np.array([data[i:i + timesteps].values for i in range(len(data) - timesteps)])).squeeze().float()
+real_trajectories = (
+    torch.tensor(np.array([data[i : i + timesteps].values for i in range(len(data) - timesteps)])).squeeze().float()
+)
 
 # Apply tanh to the normalized data to restrict the range
 real_trajectories = torch.tanh(real_trajectories)
@@ -110,16 +123,20 @@ lr = 1e-4
 
 # Initialize the model and optimizer
 sequence_length = timesteps
-model = TrajectoryDenoisingModel(input_dim=sequence_length*trajectory_dim, hidden_dim=hidden_dim, output_dim=sequence_length*trajectory_dim).to(device)
+model = TrajectoryDenoisingModel(
+    input_dim=sequence_length * trajectory_dim, hidden_dim=hidden_dim, output_dim=sequence_length * trajectory_dim
+).to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, steps_per_epoch=num_samples // batch_size, epochs=epochs)
+lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
+    optimizer, max_lr=lr, steps_per_epoch=num_samples // batch_size, epochs=epochs
+)
 
 # Training loop
 for epoch in tqdm(range(epochs)):  # Number of training epochs
     for batch in range(num_samples // batch_size):
         optimizer.zero_grad()
 
-        target = real_trajectories[batch*batch_size:(batch+1)*batch_size].view(batch_size, -1)
+        target = real_trajectories[batch * batch_size : (batch + 1) * batch_size].view(batch_size, -1)
 
         # Sample a random timestep for each trajectory in the batch
         random_timesteps = torch.randint(0, scheduler.num_train_timesteps, (batch_size,)).long()
@@ -144,10 +161,11 @@ for epoch in tqdm(range(epochs)):  # Number of training epochs
     if epoch % 10 == 0:
         print(f"Epoch {epoch}, Loss: {loss.item()}")
 
+
 # Sampling a new sine wave trajectory after training
 def sample_trajectory(steps=50):
     # Start with random noise as the input
-    initial_noise = sampled_trajectory = torch.randn(1, timesteps*trajectory_dim, device=device)
+    initial_noise = sampled_trajectory = torch.randn(1, timesteps * trajectory_dim, device=device)
 
     scheduler.set_timesteps(steps)
 
@@ -157,22 +175,24 @@ def sample_trajectory(steps=50):
             predicted_noise = model(sampled_trajectory, torch.tensor([t], device=device))
             sampled_trajectory = scheduler.step(predicted_noise, t, sampled_trajectory).prev_sample
 
-    return sampled_trajectory.view(1, sequence_length, trajectory_dim), initial_noise.view(1, sequence_length, trajectory_dim)
+    return sampled_trajectory.view(1, sequence_length, trajectory_dim), initial_noise.view(
+        1, sequence_length, trajectory_dim
+    )
+
 
 while True:
     # Generate 5 new sine wave trajectories
     plt.figure(figsize=(12, 6))
-    for i in range(1):
-        sampled_trajectory, initial_noise = sample_trajectory()
-        # plot the sampled trajectory for each joint in a subplot
-        for j in range(trajectory_dim):
-            plt.subplot(3, 4, j + 1)
-            plt.plot(sampled_trajectory[0, :, j].cpu().numpy(), label="Sampled Trajectory")
-            #plt.plot(initial_noise[0, :, j].cpu().numpy(), label="Initial Noise")
-            plt.title(f"Joint {data.columns[j]}")
+    sampled_trajectory, initial_noise = sample_trajectory()
+    # plot the sampled trajectory for each joint in a subplot
+    for j in range(trajectory_dim):
+        plt.subplot(3, 4, j + 1)
+        plt.plot(sampled_trajectory[0, :, j].cpu().numpy(), label="Sampled Trajectory")
+        # plt.plot(initial_noise[0, :, j].cpu().numpy(), label="Initial Noise")
+        plt.title(f"Joint {data.columns[j]}")
 
-    #plt.title("Sampled Sine Wave Trajectories")
-    #plt.xlabel("Time")
-    #plt.ylabel("Amplitude")
+    # plt.title("Sampled Sine Wave Trajectories")
+    # plt.xlabel("Time")
+    # plt.ylabel("Amplitude")
     plt.legend()
     plt.show()
