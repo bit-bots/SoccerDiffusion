@@ -1,0 +1,10 @@
+{
+    "cSpell.words": [
+        "ddlitlab",
+        "nullable",
+        "sessionmaker",
+        "sqlalchemy",
+        "sqlite"
+    ],
+    "python.analysis.typeCheckingMode": "basic"
+}

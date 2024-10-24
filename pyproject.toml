@@ -1,4 +1,25 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "ddlitlab2024"
+version = "0.0.1"
+readme = "README.md"
+repository = "https://github.com/bit-bots/ddlitlab2024"
+authors = [
+  "Florian Vahl",
+  "Jan Gutsche",
+  "Joern Griepenburg",
+]
+description = ""
+
+[tool.poetry.dependencies]
+python = "^3.12"
+sqlalchemy = "^2.0.36"
+
 [tool.ruff]
+fix = true
 line-length = 120
 
 [tool.ruff.lint]
@@ -11,3 +32,6 @@ line-length = 120
 # - pep8-naming convenrtions (`N`)
 # - pyupgrade prefer newer language constructs (`UP`)
 select = ["F", "E", "B", "W", "I", "N", "UP"]
+
+[tool.poetry.scripts]
+create-db = "ddlitlab2024.dataset.schema:main"
