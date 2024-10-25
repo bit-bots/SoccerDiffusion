@@ -6,6 +6,8 @@ from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from torch import nn
 from tqdm import tqdm
+from matplotlib import cm
+from ema_pytorch import EMA
 
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -105,7 +107,7 @@ plt.legend()
 plt.show()
 
 epochs = 100
-batch_size = 32
+batch_size = 64
 
 # Initialize the Transformer model and optimizer, and move model to device
 model = TrajectoryTransformerModel(
@@ -115,8 +117,9 @@ model = TrajectoryTransformerModel(
     num_heads=num_heads,
     max_seq_len=sequence_length,
 ).to(device)
+ema = EMA(model, beta=0.9999, update_every=10)
 
-lr = 1e-3
+lr = 1e-4
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, total_steps=epochs * (num_samples // batch_size))
@@ -142,16 +145,6 @@ for epoch in tqdm(range(epochs)):  # Number of training epochs
         # Forward diffusion: Add noise to the entire trajectory at the random timestep
         noisy_trajectory = scheduler.add_noise(targets, noise, random_timesteps)
 
-        # Plot the noisy trajectory and the original trajectory
-        # plt.figure(figsize=(12, 6))
-        # plt.plot(time.cpu(), targets[0].cpu(), label="Original Trajectory")
-        # plt.plot(time.cpu(), noisy_trajectory[0].cpu(), label="Noisy Trajectory")
-        # plt.title("Sine Wave Trajectories")
-        # plt.xlabel("Time")
-        # plt.ylabel("Amplitude")
-        # plt.legend()
-        # plt.show()
-
         # Predict the error using the model
         predicted_bins = model(noisy_trajectory, random_timesteps).view(batch_size, sequence_length)
 
@@ -164,13 +157,14 @@ for epoch in tqdm(range(epochs)):  # Number of training epochs
         loss.backward()
         optimizer.step()
         lr_scheduler.step()
+        ema.update()
 
     if epoch % 2 == 0:
         print(f"Epoch {epoch}, Loss: {mean_loss / (num_samples // batch_size)}, LR: {lr_scheduler.get_last_lr()[0]}")
 
 
 # Sampling a new trajectory after training
-def sample_trajectory(length=sequence_length, step_size=5, diffusion_steps=20):
+def sample_trajectory(length=sequence_length, step_size=1, diffusion_steps=1000):
     scheduler.set_timesteps(diffusion_steps)
 
     context = torch.zeros(1, 0, 1).to(device)
@@ -179,17 +173,29 @@ def sample_trajectory(length=sequence_length, step_size=5, diffusion_steps=20):
 
         sampled_trajectory = torch.randn(1, step_size, 1).to(device)
 
+        plt.figure(figsize=(12, 6))
+
         for t in scheduler.timesteps:
             with torch.no_grad():
-                print(t)
 
                 sample_trajectory_with_context = torch.cat([context, sampled_trajectory], dim=1)
 
                 # Predict the noise residual
-                noise_pred = model(sample_trajectory_with_context, torch.tensor([t], device=device))[:, -step_size:]
+                noise_pred = ema(sample_trajectory_with_context, torch.tensor([t], device=device))[:, -step_size:]
 
                 # Normally we'd rely on the scheduler to handle the update step:
                 sampled_trajectory = scheduler.step(noise_pred, t, sampled_trajectory).prev_sample
+
+            # Plot the context and the sampled trajectory
+            color = cm.viridis(t / scheduler.config.num_train_timesteps)
+            plt.plot(time.cpu()[context.size(1) : context.size(1) + step_size, 0], sampled_trajectory[0,:,0].cpu(), label="Sampled Trajectory", color=color)
+        plt.plot(time.cpu()[: context.size(1), 0], context[0,:,0].cpu(), label="Context", color=color)
+        if context.size(1) > 0:
+            plt.plot(time.cpu()[context.size(1) - 1: context.size(1) + 1], [context[0, -1, 0].cpu(), sampled_trajectory[0, 0, 0].cpu()], color='black')
+        plt.title("Sampled Sine Wave Trajectory")
+        plt.xlabel("Time")
+        plt.ylabel("Amplitude")
+        plt.show()
 
         context = torch.cat([context, sampled_trajectory], dim=1)
 
