@@ -266,6 +266,20 @@ torch = ["accelerate (>=0.31.0)", "torch (>=1.4,<2.5.0)"]
 training = ["Jinja2", "accelerate (>=0.31.0)", "datasets", "peft (>=0.6.0)", "protobuf (>=3.20.3,<4)", "tensorboard"]
 
 [[package]]
+name = "ema-pytorch"
+version = "0.7.3"
+description = "Easy way to keep track of exponential moving average version of your pytorch module"
+optional = false
+python-versions = "*"
+files = [
+    {file = "ema_pytorch-0.7.3-py3-none-any.whl", hash = "sha256:9222c09e1bbd8aa9a3e51dc4f4e95c202c80a5df3d826d33ab3b22ec539f51bf"},
+    {file = "ema_pytorch-0.7.3.tar.gz", hash = "sha256:de640f1d1a054c79607aebfcfd4b8dfff1fba1110bf0c8f7d37517637450938a"},
+]
+
+[package.dependencies]
+torch = ">=2.0"
+
+[[package]]
 name = "filelock"
 version = "3.16.1"
 description = "A platform independent file lock."
@@ -1929,4 +1943,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "18744b26ee0b58567f603a109e7b2baf5a2f0504ee7910b896a29fb095ea9f2a"
+content-hash = "75f926f2d1100a0c0470e7182f73ca56029dcaddecfb8dfc1e486bd3bcbe9891"
