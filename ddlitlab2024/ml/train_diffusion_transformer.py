@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F  # noqa
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
-from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from torch import nn
 from tqdm import tqdm
 from matplotlib import cm
@@ -82,15 +81,19 @@ class StepToken(nn.Module):
         return emb
 
 
-# Define dimensions for the Transformer model
+# Define hyperparameters
 trajectory_dim = 1  # 1D input for the sine wave
 hidden_dim = 256
 num_layers = 4
 num_heads = 4
 sequence_length = 30
+epochs = 200
+batch_size = 64
+num_samples = 5000
+lr = 1e-4
+train_timesteps = 1000
 
 # Generate a dataset of sine wave trajectories (500 samples)
-num_samples = 5000
 time = torch.linspace(0, 2 * np.pi, sequence_length).unsqueeze(-1).to(device)
 real_trajectories = torch.sin(time + torch.rand(1, num_samples).to(device) * 2 * np.pi).permute(1, 0).to(device)
 
@@ -104,8 +107,6 @@ plt.ylabel("Amplitude")
 plt.legend()
 plt.show()
 
-epochs = 200
-batch_size = 64
 
 # Initialize the Transformer model and optimizer, and move model to device
 model = TrajectoryTransformerModel(
@@ -117,13 +118,12 @@ model = TrajectoryTransformerModel(
 ).to(device)
 ema = EMA(model, beta=0.9999)
 
-lr = 1e-4
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, total_steps=epochs * (num_samples // batch_size))
 
 scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2")
-scheduler.config.num_train_timesteps = 1000
+scheduler.config.num_train_timesteps = train_timesteps
 
 # Training loop
 for epoch in tqdm(range(epochs)):  # Number of training epochs
