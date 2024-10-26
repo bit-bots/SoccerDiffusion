@@ -1,12 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn.functional as F  # noqa
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from ema_pytorch import EMA
 from torch import nn
 from tqdm import tqdm
-import pandas as pd
 
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -96,18 +96,18 @@ data = pd.read_csv("joint_commands.csv")
 
 # Extract the joint command data all joints, and drop the time column
 joints = [
-    #"LHipYaw",
-    #"RHipYaw",
-    #"LHipRoll",
-    #"RHipRoll",
-    #"LHipPitch",
-    #"RHipPitch",
+    # "LHipYaw",
+    # "RHipYaw",
+    # "LHipRoll",
+    # "RHipRoll",
+    # "LHipPitch",
+    # "RHipPitch",
     "LKnee",
     "RKnee",
-    #"LAnklePitch",
-    #"RAnklePitch",
-    #"LAnkleRoll",
-    #"RAnkleRoll",
+    # "LAnklePitch",
+    # "RAnklePitch",
+    # "LAnkleRoll",
+    # "RAnkleRoll",
 ]
 data = data[joints]
 trajectory_dim = len(joints)

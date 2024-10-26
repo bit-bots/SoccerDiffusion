@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F  # noqa
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
-from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from ema_pytorch import EMA
 from torch import nn
 
@@ -89,18 +88,18 @@ train_timesteps = 1000
 
 # Extract the joint command data all joints, and drop the time column
 joints = [
-    #"LHipYaw",
-    #"RHipYaw",
-    #"LHipRoll",
-    #"RHipRoll",
-    #"LHipPitch",
-    #"RHipPitch",
+    # "LHipYaw",
+    # "RHipYaw",
+    # "LHipRoll",
+    # "RHipRoll",
+    # "LHipPitch",
+    # "RHipPitch",
     "LKnee",
     "RKnee",
-    #"LAnklePitch",
-    #"RAnklePitch",
-    #"LAnkleRoll",
-    #"RAnkleRoll",
+    # "LAnklePitch",
+    # "RAnklePitch",
+    # "LAnkleRoll",
+    # "RAnkleRoll",
 ]
 trajectory_dim = len(joints)
 
