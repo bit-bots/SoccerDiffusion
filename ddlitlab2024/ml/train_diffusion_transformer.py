@@ -18,11 +18,15 @@ class TrajectoryTransformerModel(nn.Module):
         super().__init__()
         self.embedding = nn.Linear(num_joints, hidden_dim)
         self.positional_encoding = PositionalEncoding(hidden_dim, max_seq_len + 1)
-        self.step_encoding = StepEncoding(hidden_dim)
+        self.step_encoding = StepToken(hidden_dim, device=device)
         self.transformer_decoder = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(
-                d_model=hidden_dim, nhead=num_heads, dim_feedforward=hidden_dim, batch_first=True, norm_first=True, activation=
-                "gelu"
+                d_model=hidden_dim,
+                nhead=num_heads,
+                dim_feedforward=hidden_dim,
+                batch_first=True,
+                norm_first=True,
+                activation="gelu"
             ),
             num_layers=num_layers,
         )
@@ -34,10 +38,10 @@ class TrajectoryTransformerModel(nn.Module):
         x = x.view(x.size(0), x.size(1), -1)
         # Embed the input
         x = self.embedding(x)
-        # Add token for the step
-        x = torch.cat([self.step_encoding(step).unsqueeze(1), x], dim=1)
         # Positional encoding
         x += self.positional_encoding(x)
+        # Add token for the step
+        x = torch.cat([self.step_encoding(step), x], dim=1)
         # Create a causal mask
         tgt_mask = self.generate_square_subsequent_mask(x.size(1)).to(x.device)
         # Memory tensor (not used)
@@ -71,23 +75,24 @@ class PositionalEncoding(nn.Module):
 
 
 # Sinosoidal step encoding
-class StepEncoding(nn.Module):
-    def __init__(self, dim):
+class StepToken(nn.Module):
+    def __init__(self, dim, device=device):
         super().__init__()
         self.dim = dim
+        self.token = nn.Parameter(torch.randn(1, dim // 2, device=device))
 
     def forward(self, x):
-        half_dim = self.dim // 2
+        half_dim = self.dim // 4
         emb = torch.exp(torch.arange(half_dim, device=x.device) * -np.log(10000) / (half_dim - 1))
         emb = x[:, None] * emb[None, :]
-        emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
+        emb = torch.cat((emb.sin(), emb.cos(), self.token.expand((x.size(0), self.dim // 2))), dim=-1).unsqueeze(1)
         return emb
 
 
 # Define dimensions for the Transformer model
 trajectory_dim = 1  # 1D input for the sine wave
 hidden_dim = 256
-num_layers = 1
+num_layers = 4
 num_heads = 4
 sequence_length = 30
 
@@ -107,7 +112,7 @@ plt.legend()
 plt.show()
 
 epochs = 100
-batch_size = 64
+batch_size = 32
 
 # Initialize the Transformer model and optimizer, and move model to device
 model = TrajectoryTransformerModel(
@@ -117,16 +122,15 @@ model = TrajectoryTransformerModel(
     num_heads=num_heads,
     max_seq_len=sequence_length,
 ).to(device)
-ema = EMA(model, beta=0.9999, update_every=10)
+ema = EMA(model, beta=0.9999)
 
 lr = 1e-4
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
 lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, total_steps=epochs * (num_samples // batch_size))
 
-scheduler = DDPMScheduler(beta_schedule="squaredcos_cap_v2")
+scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2")
 scheduler.config.num_train_timesteps = 1000
-
 
 # Training loop
 for epoch in tqdm(range(epochs)):  # Number of training epochs
@@ -164,7 +168,7 @@ for epoch in tqdm(range(epochs)):  # Number of training epochs
 
 
 # Sampling a new trajectory after training
-def sample_trajectory(length=sequence_length, step_size=1, diffusion_steps=1000):
+def sample_trajectory(length=sequence_length, step_size=30, diffusion_steps=50):
     scheduler.set_timesteps(diffusion_steps)
 
     context = torch.zeros(1, 0, 1).to(device)
@@ -212,3 +216,6 @@ def sample_trajectory(length=sequence_length, step_size=1, diffusion_steps=1000)
 for _ in range(20):
     # Plot the sampled trajectory
     sample_trajectory()
+
+# Save the model
+torch.save(ema.state_dict(), "trajectory_transformer_model.pth")
