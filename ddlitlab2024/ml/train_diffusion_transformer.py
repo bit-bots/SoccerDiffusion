@@ -42,21 +42,14 @@ class TrajectoryTransformerModel(nn.Module):
         x += self.positional_encoding(x)
         # Add token for the step
         x = torch.cat([self.step_encoding(step), x], dim=1)
-        # Create a causal mask
-        tgt_mask = self.generate_square_subsequent_mask(x.size(1)).to(x.device)
         # Memory tensor (not used)
         memory = torch.zeros(x.size(0), 1, x.size(2)).to(x.device)
         # Pass through the transformer decoder
-        out = self.transformer_decoder(x, memory, tgt_mask=tgt_mask)  # Causal mask applied
+        out = self.transformer_decoder(x, memory)  # Causal mask applied
         # Remove the step token
         out = out[:, 1:]
         # Final classification layer (logits for each bin)
         return self.fc_out(out)
-
-    def generate_square_subsequent_mask(self, sz):
-        mask = torch.triu(torch.ones(sz, sz), diagonal=1)
-        mask = mask.masked_fill(mask == 1, float("-inf"))
-        return mask
 
 
 # Positional Encoding class for the Transformer
@@ -111,8 +104,8 @@ plt.ylabel("Amplitude")
 plt.legend()
 plt.show()
 
-epochs = 100
-batch_size = 32
+epochs = 200
+batch_size = 64
 
 # Initialize the Transformer model and optimizer, and move model to device
 model = TrajectoryTransformerModel(
@@ -166,56 +159,6 @@ for epoch in tqdm(range(epochs)):  # Number of training epochs
     if epoch % 2 == 0:
         print(f"Epoch {epoch}, Loss: {mean_loss / (num_samples // batch_size)}, LR: {lr_scheduler.get_last_lr()[0]}")
 
-
-# Sampling a new trajectory after training
-def sample_trajectory(length=sequence_length, step_size=30, diffusion_steps=50):
-    scheduler.set_timesteps(diffusion_steps)
-
-    context = torch.zeros(1, 0, 1).to(device)
-
-    for _ in range(length // step_size):
-
-        sampled_trajectory = torch.randn(1, step_size, 1).to(device)
-
-        plt.figure(figsize=(12, 6))
-
-        for t in scheduler.timesteps:
-            with torch.no_grad():
-
-                sample_trajectory_with_context = torch.cat([context, sampled_trajectory], dim=1)
-
-                # Predict the noise residual
-                noise_pred = ema(sample_trajectory_with_context, torch.tensor([t], device=device))[:, -step_size:]
-
-                # Normally we'd rely on the scheduler to handle the update step:
-                sampled_trajectory = scheduler.step(noise_pred, t, sampled_trajectory).prev_sample
-
-            # Plot the context and the sampled trajectory
-            color = cm.viridis(t / scheduler.config.num_train_timesteps)
-            plt.plot(time.cpu()[context.size(1) : context.size(1) + step_size, 0], sampled_trajectory[0,:,0].cpu(), label="Sampled Trajectory", color=color)
-        plt.plot(time.cpu()[: context.size(1), 0], context[0,:,0].cpu(), label="Context", color=color)
-        if context.size(1) > 0:
-            plt.plot(time.cpu()[context.size(1) - 1: context.size(1) + 1], [context[0, -1, 0].cpu(), sampled_trajectory[0, 0, 0].cpu()], color='black')
-        plt.title("Sampled Sine Wave Trajectory")
-        plt.xlabel("Time")
-        plt.ylabel("Amplitude")
-        plt.show()
-
-        context = torch.cat([context, sampled_trajectory], dim=1)
-
-    # Plot the sampled trajectory
-    plt.figure(figsize=(12, 6))
-    plt.plot(time.cpu(), context[0].cpu(), label="Sampled Trajectory")
-    plt.title("Sampled Sine Wave Trajectory")
-    plt.xlabel("Time")
-    plt.ylabel("Amplitude")
-    plt.legend()
-    plt.show()
-
-
-for _ in range(20):
-    # Plot the sampled trajectory
-    sample_trajectory()
 
 # Save the model
 torch.save(ema.state_dict(), "trajectory_transformer_model.pth")
