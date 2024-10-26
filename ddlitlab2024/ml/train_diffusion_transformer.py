@@ -144,10 +144,10 @@ for epoch in tqdm(range(epochs)):  # Number of training epochs
         noisy_trajectory = scheduler.add_noise(targets, noise, random_timesteps)
 
         # Predict the error using the model
-        predicted_bins = model(noisy_trajectory, random_timesteps).view(batch_size, sequence_length)
+        predicted_traj = model(noisy_trajectory, random_timesteps).view(batch_size, sequence_length)
 
         # Compute the loss
-        loss = F.mse_loss(predicted_bins, noise)
+        loss = F.mse_loss(predicted_traj, noise)
 
         mean_loss += loss.item()
 
