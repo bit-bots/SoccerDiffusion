@@ -3,11 +3,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F  # noqa
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
-from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
-from torch import nn
-from tqdm import tqdm
-from matplotlib import cm
 from ema_pytorch import EMA
+from torch import nn
 
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -26,7 +23,7 @@ class TrajectoryTransformerModel(nn.Module):
                 dim_feedforward=hidden_dim,
                 batch_first=True,
                 norm_first=True,
-                activation="gelu"
+                activation="gelu",
             ),
             num_layers=num_layers,
         )
@@ -45,16 +42,11 @@ class TrajectoryTransformerModel(nn.Module):
         # Memory tensor (not used)
         memory = torch.zeros(x.size(0), 1, x.size(2)).to(x.device)
         # Pass through the transformer decoder
-        out = self.transformer_decoder(x)  # Causal mask applied
+        out = self.transformer_decoder(x, memory)  # Causal mask applied
         # Remove the step token
         out = out[:, 1:]
         # Final classification layer (logits for each bin)
         return self.fc_out(out)
-
-    def generate_square_subsequent_mask(self, sz):
-        mask = torch.triu(torch.ones(sz, sz), diagonal=1)
-        mask = mask.masked_fill(mask == 1, float("-inf"))
-        return mask
 
 
 # Positional Encoding class for the Transformer
@@ -111,6 +103,7 @@ scheduler.config.num_train_timesteps = 1000
 # Load the model
 ema.load_state_dict(torch.load("trajectory_transformer_model.pth"))
 
+
 # Sampling a new trajectory after training
 def sample_trajectory(length=sequence_length, step_size=30, diffusion_steps=8):
     scheduler.set_timesteps(diffusion_steps)
@@ -118,12 +111,10 @@ def sample_trajectory(length=sequence_length, step_size=30, diffusion_steps=8):
     context = torch.zeros(1, 0, 1).to(device)
 
     for _ in range(length // step_size):
-
         sampled_trajectory = torch.randn(1, step_size, 1).to(device)
 
         for t in scheduler.timesteps:
             with torch.no_grad():
-
                 sample_trajectory_with_context = torch.cat([context, sampled_trajectory], dim=1)
 
                 # Predict the noise residual

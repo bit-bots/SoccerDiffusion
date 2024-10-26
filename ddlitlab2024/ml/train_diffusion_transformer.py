@@ -3,10 +3,9 @@ import numpy as np
 import torch
 import torch.nn.functional as F  # noqa
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
+from ema_pytorch import EMA
 from torch import nn
 from tqdm import tqdm
-from matplotlib import cm
-from ema_pytorch import EMA
 
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -25,7 +24,7 @@ class TrajectoryTransformerModel(nn.Module):
                 dim_feedforward=hidden_dim,
                 batch_first=True,
                 norm_first=True,
-                activation="gelu"
+                activation="gelu",
             ),
             num_layers=num_layers,
         )
@@ -120,7 +119,9 @@ ema = EMA(model, beta=0.9999)
 
 
 optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, total_steps=epochs * (num_samples // batch_size))
+lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
+    optimizer, max_lr=lr, total_steps=epochs * (num_samples // batch_size)
+)
 
 scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2")
 scheduler.config.num_train_timesteps = train_timesteps
