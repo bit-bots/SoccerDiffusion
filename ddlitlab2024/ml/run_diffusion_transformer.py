@@ -42,12 +42,10 @@ class TrajectoryTransformerModel(nn.Module):
         x += self.positional_encoding(x)
         # Add token for the step
         x = torch.cat([self.step_encoding(step), x], dim=1)
-        # Create a causal mask
-        tgt_mask = self.generate_square_subsequent_mask(x.size(1)).to(x.device)
         # Memory tensor (not used)
         memory = torch.zeros(x.size(0), 1, x.size(2)).to(x.device)
         # Pass through the transformer decoder
-        out = self.transformer_decoder(x, memory, tgt_mask=tgt_mask)  # Causal mask applied
+        out = self.transformer_decoder(x)  # Causal mask applied
         # Remove the step token
         out = out[:, 1:]
         # Final classification layer (logits for each bin)
@@ -114,7 +112,7 @@ scheduler.config.num_train_timesteps = 1000
 ema.load_state_dict(torch.load("trajectory_transformer_model.pth"))
 
 # Sampling a new trajectory after training
-def sample_trajectory(length=sequence_length, step_size=8, diffusion_steps=10):
+def sample_trajectory(length=sequence_length, step_size=30, diffusion_steps=8):
     scheduler.set_timesteps(diffusion_steps)
 
     context = torch.zeros(1, 0, 1).to(device)
