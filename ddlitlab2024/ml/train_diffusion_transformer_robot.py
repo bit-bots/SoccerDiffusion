@@ -32,9 +32,7 @@ class TrajectoryTransformerModel(nn.Module):
         self.fc_out = nn.Linear(hidden_dim, num_joints)
 
     def forward(self, x, step):
-        # x shape: (batch_size, seq_len, joint, num_bins)
-        # Flatten the joint and bin dimensions into a single token dimension
-        x = x.view(x.size(0), x.size(1), -1)
+        # x shape: (batch_size, seq_len, joint)
         # Embed the input
         x = self.embedding(x)
         # Positional encoding
@@ -47,7 +45,7 @@ class TrajectoryTransformerModel(nn.Module):
         out = self.transformer_decoder(x, memory)  # Causal mask applied
         # Remove the step token
         out = out[:, 1:]
-        # Final classification layer (logits for each bin)
+        # Final projection layer
         return self.fc_out(out)
 
 
