@@ -1,82 +1,12 @@
 import matplotlib.pyplot as plt
-import numpy as np
 import torch
 import torch.nn.functional as F  # noqa
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from ema_pytorch import EMA
-from torch import nn
+from ddlitlab2024.ml.train_diffusion_transformer import TrajectoryTransformerModel
 
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-class TrajectoryTransformerModel(nn.Module):
-    def __init__(self, num_joints, hidden_dim, num_layers, num_heads, max_seq_len):
-        super().__init__()
-        self.embedding = nn.Linear(num_joints, hidden_dim)
-        self.positional_encoding = PositionalEncoding(hidden_dim, max_seq_len + 1)
-        self.step_encoding = StepToken(hidden_dim, device=device)
-        self.transformer_decoder = nn.TransformerDecoder(
-            nn.TransformerDecoderLayer(
-                d_model=hidden_dim,
-                nhead=num_heads,
-                dim_feedforward=hidden_dim,
-                batch_first=True,
-                norm_first=True,
-                activation="gelu",
-            ),
-            num_layers=num_layers,
-        )
-        self.fc_out = nn.Linear(hidden_dim, num_joints)
-
-    def forward(self, x, step):
-        # x shape: (batch_size, seq_len, joint, num_bins)
-        # Flatten the joint and bin dimensions into a single token dimension
-        x = x.view(x.size(0), x.size(1), -1)
-        # Embed the input
-        x = self.embedding(x)
-        # Positional encoding
-        x += self.positional_encoding(x)
-        # Add token for the step
-        x = torch.cat([self.step_encoding(step), x], dim=1)
-        # Memory tensor (not used)
-        memory = torch.zeros(x.size(0), 1, x.size(2)).to(x.device)
-        # Pass through the transformer decoder
-        out = self.transformer_decoder(x, memory)  # Causal mask applied
-        # Remove the step token
-        out = out[:, 1:]
-        # Final classification layer (logits for each bin)
-        return self.fc_out(out)
-
-
-# Positional Encoding class for the Transformer
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_len):
-        super().__init__()
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        self.pe = pe.unsqueeze(0)
-
-    def forward(self, x):
-        return self.pe[:, : x.size(1)].to(x.device)
-
-
-# Sinosoidal step encoding
-class StepToken(nn.Module):
-    def __init__(self, dim, device=device):
-        super().__init__()
-        self.dim = dim
-        self.token = nn.Parameter(torch.randn(1, dim // 2, device=device))
-
-    def forward(self, x):
-        half_dim = self.dim // 4
-        emb = torch.exp(torch.arange(half_dim, device=x.device) * -np.log(10000) / (half_dim - 1))
-        emb = x[:, None] * emb[None, :]
-        emb = torch.cat((emb.sin(), emb.cos(), self.token.expand((x.size(0), self.dim // 2))), dim=-1).unsqueeze(1)
-        return emb
 
 
 # Define dimensions for the Transformer model

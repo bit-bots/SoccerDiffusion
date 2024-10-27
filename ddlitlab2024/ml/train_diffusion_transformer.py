@@ -79,87 +79,88 @@ class StepToken(nn.Module):
         emb = torch.cat((emb.sin(), emb.cos(), self.token.expand((x.size(0), self.dim // 2))), dim=-1).unsqueeze(1)
         return emb
 
+if __name__ == "__main__":
 
-# Define hyperparameters
-trajectory_dim = 1  # 1D input for the sine wave
-hidden_dim = 256
-num_layers = 4
-num_heads = 4
-sequence_length = 30
-epochs = 200
-batch_size = 64
-num_samples = 5000
-lr = 1e-4
-train_timesteps = 1000
+    # Define hyperparameters
+    trajectory_dim = 1  # 1D input for the sine wave
+    hidden_dim = 256
+    num_layers = 4
+    num_heads = 4
+    sequence_length = 30
+    epochs = 200
+    batch_size = 64
+    num_samples = 5000
+    lr = 1e-4
+    train_timesteps = 1000
 
-# Generate a dataset of sine wave trajectories (500 samples)
-time = torch.linspace(0, 2 * np.pi, sequence_length).unsqueeze(-1).to(device)
-real_trajectories = torch.sin(time + torch.rand(1, num_samples).to(device) * 2 * np.pi).permute(1, 0).to(device)
+    # Generate a dataset of sine wave trajectories (500 samples)
+    time = torch.linspace(0, 2 * np.pi, sequence_length).unsqueeze(-1).to(device)
+    real_trajectories = torch.sin(time + torch.rand(1, num_samples).to(device) * 2 * np.pi).permute(1, 0).to(device)
 
-# Plot the first 5 sine wave trajectories
-plt.figure(figsize=(12, 6))
-for i in range(5):
-    plt.plot(time.cpu(), real_trajectories[i].cpu(), label=f"Trajectory {i + 1}")
-plt.title("Sine Wave Trajectories")
-plt.xlabel("Time")
-plt.ylabel("Amplitude")
-plt.legend()
-plt.show()
-
-
-# Initialize the Transformer model and optimizer, and move model to device
-model = TrajectoryTransformerModel(
-    num_joints=trajectory_dim,
-    hidden_dim=hidden_dim,
-    num_layers=num_layers,
-    num_heads=num_heads,
-    max_seq_len=sequence_length,
-).to(device)
-ema = EMA(model, beta=0.9999)
+    # Plot the first 5 sine wave trajectories
+    plt.figure(figsize=(12, 6))
+    for i in range(5):
+        plt.plot(time.cpu(), real_trajectories[i].cpu(), label=f"Trajectory {i + 1}")
+    plt.title("Sine Wave Trajectories")
+    plt.xlabel("Time")
+    plt.ylabel("Amplitude")
+    plt.legend()
+    plt.show()
 
 
-optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
-    optimizer, max_lr=lr, total_steps=epochs * (num_samples // batch_size)
-)
-
-scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2")
-scheduler.config.num_train_timesteps = train_timesteps
-
-# Training loop
-for epoch in tqdm(range(epochs)):  # Number of training epochs
-    mean_loss = 0
-    for batch in range(num_samples // batch_size):
-        targets = real_trajectories[batch * batch_size : (batch + 1) * batch_size].to(device)
-
-        optimizer.zero_grad()
-
-        # Sample a random timestep for each trajectory in the batch
-        random_timesteps = torch.randint(0, scheduler.config.num_train_timesteps, (batch_size,)).long().to(device)
-
-        # Sample noise to add to the entire trajectory
-        noise = torch.randn_like(targets).to(device)
-
-        # Forward diffusion: Add noise to the entire trajectory at the random timestep
-        noisy_trajectory = scheduler.add_noise(targets, noise, random_timesteps)
-
-        # Predict the error using the model
-        predicted_traj = model(noisy_trajectory, random_timesteps).view(batch_size, sequence_length)
-
-        # Compute the loss
-        loss = F.mse_loss(predicted_traj, noise)
-
-        mean_loss += loss.item()
-
-        # Backpropagation and optimization
-        loss.backward()
-        optimizer.step()
-        lr_scheduler.step()
-        ema.update()
-
-    if epoch % 2 == 0:
-        print(f"Epoch {epoch}, Loss: {mean_loss / (num_samples // batch_size)}, LR: {lr_scheduler.get_last_lr()[0]}")
+    # Initialize the Transformer model and optimizer, and move model to device
+    model = TrajectoryTransformerModel(
+        num_joints=trajectory_dim,
+        hidden_dim=hidden_dim,
+        num_layers=num_layers,
+        num_heads=num_heads,
+        max_seq_len=sequence_length,
+    ).to(device)
+    ema = EMA(model, beta=0.9999)
 
 
-# Save the model
-torch.save(ema.state_dict(), "trajectory_transformer_model.pth")
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
+    lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer, max_lr=lr, total_steps=epochs * (num_samples // batch_size)
+    )
+
+    scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2")
+    scheduler.config.num_train_timesteps = train_timesteps
+
+    # Training loop
+    for epoch in tqdm(range(epochs)):  # Number of training epochs
+        mean_loss = 0
+        for batch in range(num_samples // batch_size):
+            targets = real_trajectories[batch * batch_size : (batch + 1) * batch_size].to(device)
+
+            optimizer.zero_grad()
+
+            # Sample a random timestep for each trajectory in the batch
+            random_timesteps = torch.randint(0, scheduler.config.num_train_timesteps, (batch_size,)).long().to(device)
+
+            # Sample noise to add to the entire trajectory
+            noise = torch.randn_like(targets).to(device)
+
+            # Forward diffusion: Add noise to the entire trajectory at the random timestep
+            noisy_trajectory = scheduler.add_noise(targets, noise, random_timesteps)
+
+            # Predict the error using the model
+            predicted_traj = model(noisy_trajectory, random_timesteps).view(batch_size, sequence_length)
+
+            # Compute the loss
+            loss = F.mse_loss(predicted_traj, noise)
+
+            mean_loss += loss.item()
+
+            # Backpropagation and optimization
+            loss.backward()
+            optimizer.step()
+            lr_scheduler.step()
+            ema.update()
+
+        if epoch % 2 == 0:
+            print(f"Epoch {epoch}, Loss: {mean_loss / (num_samples // batch_size)}, LR: {lr_scheduler.get_last_lr()[0]}")
+
+
+    # Save the model
+    torch.save(ema.state_dict(), "trajectory_transformer_model.pth")
