@@ -31,6 +31,11 @@ class TrajectoryTransformerModel(nn.Module):
         )
         self.fc_out = nn.Linear(hidden_dim, num_joints)
 
+
+        # Store normalization parameters
+        self.register_buffer("mean", torch.zeros(num_joints))
+        self.register_buffer("std", torch.ones(num_joints))
+
     def forward(self, x, step):
         # x shape: (batch_size, seq_len, joint)
         # Embed the input
@@ -113,8 +118,10 @@ trajectory_dim = len(joints)
 # Drop every second data point to reduce the sequence length (subsample) TODO proper subsampling
 data = data[::3]
 
-# Normalize the joint data (-pi to pi) to (-1, 1)
-data = data / np.pi
+# Normalize the joint data
+stds = data.std()
+means = data.mean()
+data = (data - means) / stds
 
 # Chunk the data into sequences of 50 timesteps
 timesteps = sequence_length
@@ -132,6 +139,7 @@ plt.figure(figsize=(12, 6))
 for i in range(trajectory_dim):
     plt.subplot(3, 4, i + 1)
     plt.plot(real_trajectories[:n, :, i].T)
+    plt.ylim(-1, 1)
     plt.title(f"Joint {data.columns[i]}")
 plt.suptitle("LKnee Trajectories")
 plt.show()
@@ -144,6 +152,11 @@ model = TrajectoryTransformerModel(
     num_heads=num_heads,
     max_seq_len=sequence_length,
 ).to(device)
+
+# Add normalization parameters to the model
+model.mean = torch.tensor(means.values).to(device)
+model.std = torch.tensor(stds.values).to(device)
+
 ema = EMA(model, beta=0.9999)
 
 
