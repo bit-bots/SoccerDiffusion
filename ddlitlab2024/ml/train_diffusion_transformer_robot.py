@@ -86,8 +86,8 @@ hidden_dim = 256
 num_layers = 4
 num_heads = 4
 sequence_length = 100
-epochs = 40
-batch_size = 64
+epochs = 400
+batch_size = 128
 lr = 1e-4
 train_timesteps = 1000
 
