@@ -96,18 +96,18 @@ data = pd.read_csv("joint_commands.csv")
 
 # Extract the joint command data all joints, and drop the time column
 joints = [
-    # "LHipYaw",
-    # "RHipYaw",
-    # "LHipRoll",
-    # "RHipRoll",
-    # "LHipPitch",
-    # "RHipPitch",
+    "LHipYaw",
+    "RHipYaw",
+    "LHipRoll",
+    "RHipRoll",
+    "LHipPitch",
+    "RHipPitch",
     "LKnee",
     "RKnee",
-    # "LAnklePitch",
-    # "RAnklePitch",
-    # "LAnkleRoll",
-    # "RAnkleRoll",
+    "LAnklePitch",
+    "RAnklePitch",
+    "LAnkleRoll",
+    "RAnkleRoll",
 ]
 data = data[joints]
 trajectory_dim = len(joints)
@@ -116,7 +116,7 @@ trajectory_dim = len(joints)
 data = data[::3]
 
 # Normalize the joint data (-pi to pi) to (-1, 1)
-data = (data - data.min()) / (data.max() - data.min()) * 2 - 1
+data = data / np.pi
 
 # Chunk the data into sequences of 50 timesteps
 timesteps = sequence_length
