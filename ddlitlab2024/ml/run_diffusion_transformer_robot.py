@@ -88,18 +88,18 @@ train_timesteps = 1000
 
 # Extract the joint command data all joints, and drop the time column
 joints = [
-    # "LHipYaw",
-    # "RHipYaw",
-    # "LHipRoll",
-    # "RHipRoll",
-    # "LHipPitch",
-    # "RHipPitch",
+    "LHipYaw",
+    "RHipYaw",
+    "LHipRoll",
+    "RHipRoll",
+    "LHipPitch",
+    "RHipPitch",
     "LKnee",
     "RKnee",
-    # "LAnklePitch",
-    # "RAnklePitch",
-    # "LAnkleRoll",
-    # "RAnkleRoll",
+    "LAnklePitch",
+    "RAnklePitch",
+    "LAnkleRoll",
+    "RAnkleRoll",
 ]
 trajectory_dim = len(joints)
 
@@ -121,7 +121,7 @@ ema.load_state_dict(torch.load("trajectory_transformer_model.pth"))
 
 
 # Sampling a new trajectory after training
-def sample_trajectory(length=sequence_length, step_size=100, diffusion_steps=50):
+def sample_trajectory(length=sequence_length, step_size=100, diffusion_steps=15):
     scheduler.set_timesteps(diffusion_steps)
 
     context = torch.zeros(1, 0, trajectory_dim).to(device)
