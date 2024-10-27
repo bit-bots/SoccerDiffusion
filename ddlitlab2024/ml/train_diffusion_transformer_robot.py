@@ -165,12 +165,15 @@ lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
     optimizer, max_lr=lr, total_steps=epochs * (num_samples // batch_size)
 )
 
-scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2")
+scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2", clip_sample=False)
 scheduler.config.num_train_timesteps = train_timesteps
 
 # Training loop
 for epoch in range(epochs):  # Number of training epochs
     mean_loss = 0
+    # Shuffle the data for each epoch
+    real_trajectories = real_trajectories[torch.randperm(real_trajectories.size(0))]
+
     for batch in tqdm(range(num_samples // batch_size)):
         targets = real_trajectories[batch * batch_size : (batch + 1) * batch_size].to(device)
 
