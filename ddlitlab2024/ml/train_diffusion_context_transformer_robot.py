@@ -23,6 +23,10 @@ class TrajectoryTransformerModel(nn.Module):
             num_joints=num_joints, hidden_dim=hidden_dim, num_layers=num_layers, num_heads=num_heads, max_seq_len=trajectory_prediction_length
         )
 
+        # Store normalization parameters
+        self.register_buffer("mean", torch.zeros(num_joints))
+        self.register_buffer("std", torch.ones(num_joints))
+
     def forward(self, past_actions, noisy_action_predictions, step):
         # Encode the past actions
         context = self.action_history_encoder(past_actions)     # This can be cached during inference TODO
@@ -157,8 +161,10 @@ if __name__ == "__main__":
     # Drop every second data point to reduce the sequence length (subsample) TODO proper subsampling
     data = data[::3]
 
-    # Normalize the joint data (-pi to pi) to (-1, 1)
-    data = data / np.pi
+    # Normalize the joint data
+    stds = data.std()
+    means = data.mean()
+    data = (data - means) / stds
 
     # Chunk the data into sequences of 50 timesteps
     timesteps = action_context_length + trajectory_prediction_length
@@ -188,6 +194,11 @@ if __name__ == "__main__":
         max_action_context_length=action_context_length,
         trajectory_prediction_length=trajectory_prediction_length,
     ).to(device)
+
+    # Add normalization parameters to the model
+    model.mean = torch.tensor(means.values).to(device)
+    model.std = torch.tensor(stds.values).to(device)
+
     ema = EMA(model, beta=0.9999)
 
 
@@ -196,7 +207,7 @@ if __name__ == "__main__":
         optimizer, max_lr=lr, total_steps=epochs * (num_samples // batch_size)
     )
 
-    scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2")
+    scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2", clip_sample=False)
     scheduler.config.num_train_timesteps = train_timesteps
 
     # Training loop

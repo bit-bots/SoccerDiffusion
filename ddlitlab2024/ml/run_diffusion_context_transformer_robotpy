@@ -47,7 +47,7 @@ model = TrajectoryTransformerModel(
 ).to(device)
 ema = EMA(model, beta=0.9999)
 
-scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2")
+scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2", clip_sample=False)
 scheduler.config.num_train_timesteps = train_timesteps
 
 # Load the model
@@ -96,6 +96,9 @@ def sample_trajectory(length=1000, diffusion_steps=15):
         plt.show()
 
         context = torch.cat([context, sampled_trajectory], dim=1)
+
+    # Undo the normalization
+    context = context * model.std + model.mean
 
     # Plot the sampled trajectory
     plt.figure(figsize=(12, 6))
