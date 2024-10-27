@@ -147,6 +147,8 @@ def sample_trajectory(length=sequence_length, step_size=100, diffusion_steps=15)
     for j in range(trajectory_dim):
         plt.subplot(3, 4, j + 1)
         plt.plot(context[0, :, j].cpu(), label="Sampled Trajectory")
+        # Scale the y-axis to the range of the training data
+        plt.ylim(-1, 1)
         plt.title(f"Joint {joints[j]}")
     plt.xlabel("Time")
     plt.ylabel("Amplitude")
