@@ -7,9 +7,11 @@ class StepToken(nn.Module):
     """
     Encodes the current step of the diffusion process as a token that can be added to the context.\
     It is build from a sinusoidal positional encoding which is concatenated with a learnable token.
-    The learnable parameters are introduced to not interfere with the sinusoidal positional encoding used for other tokens in the context.
+    The learnable parameters are introduced to not interfere with
+    the sinusoidal positional encoding used for other tokens in the context.
     This way they can be separated by the attention mechanism.
     """
+
     def __init__(self, dim):
         """
         Initializes the StepToken module.
@@ -37,6 +39,7 @@ class PositionalEncoding(nn.Module):
     """
     A standard positional encoding module for the Transformer model.
     """
+
     def __init__(self, d_model, max_len):
         """
         Initializes the PositionalEncoding module.

@@ -1,4 +1,5 @@
 from torch import nn
+
 from ddlitlab2024.ml.model.misc import PositionalEncoding
 
 
@@ -7,6 +8,7 @@ class DiffusionActionGenerator(nn.Module):
     The DiffusionActionGenerator module is a transformer decoder that takes the noisy action predictions and
     the context (past actions, sensor data, etc.) as input and outputs the denoised action predictions.
     """
+
     def __init__(self, num_joints, hidden_dim, num_layers, num_heads, max_seq_len):
         """
         Initializes the DiffusionActionGenerator module.
@@ -38,7 +40,8 @@ class DiffusionActionGenerator(nn.Module):
         Forward pass of the DiffusionActionGenerator module.
 
         :param x: The noisy action predictions. Shape: (batch_size, seq_len, joint)
-        :param context: The context (diffusion step, past actions, sensor data, etc.). Shape: (batch_size, seq_len, hidden_dim)
+        :param context: The context (diffusion step, past actions, sensor data, etc.).
+            Shape: (batch_size, seq_len, hidden_dim)
         :return: The denoised action predictions. Shape: (batch_size, seq_len, joint)
         """
         # Embed the input
