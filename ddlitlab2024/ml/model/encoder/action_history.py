@@ -1,11 +1,14 @@
 import torch
 from torch import nn
+
 from ddlitlab2024.ml.model.misc import PositionalEncoding
+
 
 class ActionHistoryEncoder(nn.Module):
     """
     Transformer encoder that encodes the action history of the robot.
     """
+
     def __init__(self, num_joints, hidden_dim, num_layers, num_heads, max_seq_len):
         """
         Initializes the module.
