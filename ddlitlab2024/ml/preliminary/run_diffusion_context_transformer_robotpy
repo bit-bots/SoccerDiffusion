@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F  # noqa
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from ema_pytorch import EMA
-from ddlitlab2024.ml.train_diffusion_context_transformer_robot import TrajectoryTransformerModel
+from ddlitlab2024.ml.preliminary.train_diffusion_context_transformer_robot import TrajectoryTransformerModel
 
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
