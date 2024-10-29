@@ -13,14 +13,24 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class TrajectoryTransformerModel(nn.Module):
-    def __init__(self, num_joints, hidden_dim, num_layers, num_heads, max_action_context_length, trajectory_prediction_length):
+    def __init__(
+        self, num_joints, hidden_dim, num_layers, num_heads, max_action_context_length, trajectory_prediction_length
+    ):
         super().__init__()
         self.step_encoding = StepToken(hidden_dim, device=device)
         self.action_history_encoder = ActionHistoryEncoder(
-            num_joints=num_joints, hidden_dim=hidden_dim, num_layers=num_layers, num_heads=num_heads, max_seq_len=max_action_context_length
+            num_joints=num_joints,
+            hidden_dim=hidden_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            max_seq_len=max_action_context_length,
         )
         self.diffusion_action_generator = DiffusionActionGenerator(
-            num_joints=num_joints, hidden_dim=hidden_dim, num_layers=num_layers, num_heads=num_heads, max_seq_len=trajectory_prediction_length
+            num_joints=num_joints,
+            hidden_dim=hidden_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            max_seq_len=trajectory_prediction_length,
         )
 
         # Store normalization parameters
@@ -29,7 +39,7 @@ class TrajectoryTransformerModel(nn.Module):
 
     def forward(self, past_actions, noisy_action_predictions, step):
         # Encode the past actions
-        context = self.action_history_encoder(past_actions)     # This can be cached during inference TODO
+        context = self.action_history_encoder(past_actions)  # This can be cached during inference TODO
         # Add additional information to the context
         # Generate step token to encode the current step of the diffusion process
         step_token = self.step_encoding(step)
@@ -124,8 +134,8 @@ class StepToken(nn.Module):
         emb = torch.cat((emb.sin(), emb.cos(), self.token.expand((x.size(0), self.dim // 2))), dim=-1).unsqueeze(1)
         return emb
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     # Define hyperparameters
     hidden_dim = 256
     num_layers = 4
@@ -201,7 +211,6 @@ if __name__ == "__main__":
 
     ema = EMA(model, beta=0.9999)
 
-
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer, max_lr=lr, total_steps=epochs * (num_samples // batch_size)
@@ -250,7 +259,6 @@ if __name__ == "__main__":
 
             if (batch + 1) % 100 == 0:
                 print(f"Epoch {epoch}, Loss: {mean_loss / batch}, LR: {lr_scheduler.get_last_lr()[0]}")
-
 
     # Save the model
     torch.save(ema.state_dict(), "trajectory_transformer_model.pth")

@@ -79,8 +79,8 @@ class StepToken(nn.Module):
         emb = torch.cat((emb.sin(), emb.cos(), self.token.expand((x.size(0), self.dim // 2))), dim=-1).unsqueeze(1)
         return emb
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     # Define hyperparameters
     trajectory_dim = 1  # 1D input for the sine wave
     hidden_dim = 256
@@ -107,7 +107,6 @@ if __name__ == "__main__":
     plt.legend()
     plt.show()
 
-
     # Initialize the Transformer model and optimizer, and move model to device
     model = TrajectoryTransformerModel(
         num_joints=trajectory_dim,
@@ -117,7 +116,6 @@ if __name__ == "__main__":
         max_seq_len=sequence_length,
     ).to(device)
     ema = EMA(model, beta=0.9999)
-
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
@@ -159,8 +157,9 @@ if __name__ == "__main__":
             ema.update()
 
         if epoch % 2 == 0:
-            print(f"Epoch {epoch}, Loss: {mean_loss / (num_samples // batch_size)}, LR: {lr_scheduler.get_last_lr()[0]}")
-
+            print(
+                f"Epoch {epoch}, Loss: {mean_loss / (num_samples // batch_size)}, LR: {lr_scheduler.get_last_lr()[0]}"
+            )
 
     # Save the model
     torch.save(ema.state_dict(), "trajectory_transformer_model.pth")

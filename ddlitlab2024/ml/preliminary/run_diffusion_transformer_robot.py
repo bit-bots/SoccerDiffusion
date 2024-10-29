@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F  # noqa
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from ema_pytorch import EMA
+
 from ddlitlab2024.ml.preliminary.train_diffusion_transformer_robot import TrajectoryTransformerModel
 
 # Check if CUDA is available and set the device
