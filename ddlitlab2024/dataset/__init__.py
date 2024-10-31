@@ -3,6 +3,8 @@ import os
 
 from ddlitlab2024 import LOGGING_PATH, SESSION_ID
 
+MODULE_NAME: str = "dataset"
+
 # Init logging
 logging.basicConfig(
     filename=LOGGING_PATH,
@@ -16,5 +18,5 @@ console = logging.StreamHandler()
 console.setLevel(os.environ.get("LOGLEVEL", "INFO"))
 console.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
 
-logger = logging.getLogger("dataset")
+logger = logging.getLogger(MODULE_NAME)
 logger.addHandler(console)
