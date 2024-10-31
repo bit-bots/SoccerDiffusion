@@ -94,15 +94,19 @@ class Rotation(Base):
     _id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     stamp: Mapped[float] = mapped_column(Float, nullable=False)
     recording_id: Mapped[int] = mapped_column(Integer, ForeignKey("Recording._id"), nullable=False)
-    roll: Mapped[float] = mapped_column(Float, nullable=False)
-    pitch: Mapped[float] = mapped_column(Float, nullable=False)
+    x: Mapped[float] = mapped_column(Float, nullable=False)
+    y: Mapped[float] = mapped_column(Float, nullable=False)
+    z: Mapped[float] = mapped_column(Float, nullable=False)
+    w: Mapped[float] = mapped_column(Float, nullable=False)
 
     recording: Mapped["Recording"] = relationship("Recording", back_populates="rotations")
 
     __table_args__ = (
         CheckConstraint("stamp >= 0"),
-        CheckConstraint("roll >= 0 AND roll < 2 * pi()"),
-        CheckConstraint("pitch >= 0 AND pitch < 2 * pi()"),
+        CheckConstraint("x >= -1 AND x <= 1"),
+        CheckConstraint("y >= -1 AND y <= 1"),
+        CheckConstraint("z >= -1 AND z <= 1"),
+        CheckConstraint("w >= -1 AND w <= 1"),
     )
 
 
