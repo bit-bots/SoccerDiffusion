@@ -1,6 +1,8 @@
 import logging
 import os
 
+from rich.logging import RichHandler
+
 from ddlitlab2024 import LOGGING_PATH, SESSION_ID
 
 MODULE_NAME: str = "dataset"
@@ -14,9 +16,13 @@ logging.basicConfig(
 )
 
 # Create additional logging config for the shell with configurable log level
-console = logging.StreamHandler()
+console = RichHandler(
+    log_time_format="%H:%M:%S",
+    show_path=False,
+    rich_tracebacks=True,
+    tracebacks_show_locals=True,
+)
 console.setLevel(os.environ.get("LOGLEVEL", "INFO"))
-console.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
 
 logger = logging.getLogger(MODULE_NAME)
 logger.addHandler(console)
