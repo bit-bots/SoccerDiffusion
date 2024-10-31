@@ -30,7 +30,7 @@ jobs:
       run: poetry install
 
     - name: Create DB schema
-      run: poetry run cli db create_schema
+      run: poetry run cli db create-schema
 
     - name: Populate DB with dummy data
       run: poetry run cli db dummy-data -n 2
