@@ -25,6 +25,8 @@ torchinfo = "^1.8.0"
 numpy = "^2.1.2"
 tqdm = "^4.66.5"
 ema-pytorch = "^0.7.3"
+torchvision = "^0.20.1"
+transforms3d = "^0.4.2"
 
 [tool.ruff]
 fix = true
