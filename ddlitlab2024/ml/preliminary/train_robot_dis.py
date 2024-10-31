@@ -1,26 +1,29 @@
-import torch
-from torch import nn
-import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import torch
+import torch.nn.functional as F  # noqa
+from torch import nn
 from torchinfo import summary
 from tqdm import tqdm
-import pandas as pd
 
 # Check if CUDA is available and set the device
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 # Define the Transformer Decoder model for velocity prediction
 class TrajectoryTransformerModel(nn.Module):
     def __init__(self, num_joints, hidden_dim, num_layers, num_heads, max_seq_len, num_bins):
-        super(TrajectoryTransformerModel, self).__init__()
-        self.embedding = nn.Linear(num_joints*num_bins, hidden_dim)
+        super().__init__()
+        self.embedding = nn.Linear(num_joints * num_bins, hidden_dim)
         self.positional_encoding = PositionalEncoding(hidden_dim, max_seq_len)
         self.transformer_decoder = nn.TransformerDecoder(
-            nn.TransformerDecoderLayer(d_model=hidden_dim, nhead=num_heads, dim_feedforward=hidden_dim, batch_first=True),
-            num_layers=num_layers
+            nn.TransformerDecoderLayer(
+                d_model=hidden_dim, nhead=num_heads, dim_feedforward=hidden_dim, batch_first=True
+            ),
+            num_layers=num_layers,
         )
-        self.fc_out = nn.Linear(hidden_dim, num_joints*num_bins)
+        self.fc_out = nn.Linear(hidden_dim, num_joints * num_bins)
 
     def forward(self, x):
         # x shape: (batch_size, seq_len, joint, num_bins)
@@ -39,13 +42,14 @@ class TrajectoryTransformerModel(nn.Module):
 
     def generate_square_subsequent_mask(self, sz):
         mask = torch.triu(torch.ones(sz, sz), diagonal=1)
-        mask = mask.masked_fill(mask == 1, float('-inf'))
+        mask = mask.masked_fill(mask == 1, float("-inf"))
         return mask
+
 
 # Positional Encoding class for the Transformer
 class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len):
-        super(PositionalEncoding, self).__init__()
+        super().__init__()
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
@@ -54,7 +58,8 @@ class PositionalEncoding(nn.Module):
         self.pe = pe.unsqueeze(0)
 
     def forward(self, x):
-        return self.pe[:, :x.size(1)].to(x.device)
+        return self.pe[:, : x.size(1)].to(x.device)
+
 
 # Define dimensions for the Transformer model
 hidden_dim = 128
@@ -64,7 +69,7 @@ num_bins = 64
 sequence_length = 100
 
 # Read the robot data from the CSV file
-data = pd.read_csv('joint_commands.csv')
+data = pd.read_csv("joint_commands.csv")
 
 # Extract the joint command data all joints, and drop the time column
 joints = [
@@ -103,7 +108,9 @@ data = data[::6]
 # Chunk the data into sequences of 50 timesteps
 timesteps = sequence_length
 time = torch.linspace(0, 1, timesteps).unsqueeze(-1)
-real_trajectories = torch.tensor(np.array([data[i:i + timesteps].values for i in range(len(data) - timesteps)])).squeeze().float()
+real_trajectories = (
+    torch.tensor(np.array([data[i : i + timesteps].values for i in range(len(data) - timesteps)])).squeeze().float()
+)
 
 num_samples = real_trajectories.size(0)
 real_trajectories = real_trajectories[torch.randperm(real_trajectories.size(0))]
@@ -123,8 +130,14 @@ plt.suptitle("LKnee Trajectories")
 plt.show()
 
 # Initialize the Transformer model and optimizer, and move model to device
-model = TrajectoryTransformerModel(num_joints=trajectory_dim, hidden_dim=hidden_dim, num_layers=num_layers,
-                                   num_heads=num_heads, max_seq_len=sequence_length, num_bins=num_bins).to(device)
+model = TrajectoryTransformerModel(
+    num_joints=trajectory_dim,
+    hidden_dim=hidden_dim,
+    num_layers=num_layers,
+    num_heads=num_heads,
+    max_seq_len=sequence_length,
+    num_bins=num_bins,
+).to(device)
 summary(model, input_size=(1, 30, trajectory_dim, num_bins))
 optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
 
@@ -134,7 +147,7 @@ batch_size = 16
 # Training loop
 for epoch in tqdm(range(5)):  # Number of training epochs
     for batch in range(num_samples // batch_size):
-        targets = real_trajectories[batch * batch_size: (batch + 1) * batch_size].to(device)
+        targets = real_trajectories[batch * batch_size : (batch + 1) * batch_size].to(device)
 
         optimizer.zero_grad()
 
@@ -167,6 +180,7 @@ for epoch in tqdm(range(5)):  # Number of training epochs
         if batch % 10 == 0:
             print(f"Epoch {epoch}, Loss: {loss.item()}")
 
+
 # Sampling a new trajectory after training
 def sample_trajectory(steps=20):
     sampled_trajectory = torch.zeros(1, 1, trajectory_dim, num_bins).to(device)
@@ -177,12 +191,14 @@ def sample_trajectory(steps=20):
 
     for _ in range(steps):
         # Predict the next velocity bin using the Transformer model
-        predicted_bin = model(sampled_trajectory.view(1, -1, trajectory_dim * num_bins)).view(1, -1, trajectory_dim, num_bins)
+        predicted_bin = model(sampled_trajectory.view(1, -1, trajectory_dim * num_bins)).view(
+            1, -1, trajectory_dim, num_bins
+        )
 
         probabilities.append(predicted_bin[:, -1, 0].squeeze(0).softmax(-1).cpu().detach().numpy())
 
         # Sample top bin as the next velocity
-        #sampled_bin = torch.multinomial(predicted_bin[:, -1].softmax(-1).squeeze(), 1, replacement=True)
+        # sampled_bin = torch.multinomial(predicted_bin[:, -1].softmax(-1).squeeze(), 1, replacement=True)
         _, sampled_bin = torch.topk(predicted_bin[:, -1].softmax(-1).squeeze(), 1)
 
         # Only keep the last predicted bin
@@ -199,7 +215,7 @@ def sample_trajectory(steps=20):
 
     # Plot heatmap of the predicted bins
     plt.figure(figsize=(12, 6))
-    plt.imshow(np.asarray(probabilities).T, cmap='hot', interpolation='nearest', aspect='auto')
+    plt.imshow(np.asarray(probabilities).T, cmap="hot", interpolation="nearest", aspect="auto")
     plt.title("Predicted Bins")
     plt.xlabel("Time")
     plt.ylabel("Bin")

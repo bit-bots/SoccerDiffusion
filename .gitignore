@@ -203,3 +203,6 @@ ENV/
 
 # Ruff cache
 .ruff_cache
+
+# Torch models
+*.pth
