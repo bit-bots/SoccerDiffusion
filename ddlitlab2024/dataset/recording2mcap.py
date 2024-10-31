@@ -101,7 +101,7 @@ def write_rotations(
 
     # Write rotations
     logger.info("Writing rotations")
-    for i, rotation in enumerate(recording.rotations):
+    for rotation in recording.rotations:
         rotation_msg = Quaternion(
             x=rotation.x,
             y=rotation.y,
