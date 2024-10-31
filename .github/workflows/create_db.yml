@@ -30,4 +30,4 @@ jobs:
       run: poetry install
 
     - name: Run create-db
-      run: poetry run create-db
+      run: poetry run cli db create_schema
