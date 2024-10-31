@@ -26,6 +26,7 @@ numpy = "^2.1.2"
 tqdm = "^4.66.5"
 ema-pytorch = "^0.7.3"
 rich = "^13.9.3"
+typed-argument-parser = "^1.10.1"
 
 [tool.ruff]
 fix = true
@@ -43,4 +44,4 @@ line-length = 120
 select = ["F", "E", "B", "W", "I", "N", "UP"]
 
 [tool.poetry.scripts]
-create-db = "ddlitlab2024.dataset.schema:main"
+cli = "ddlitlab2024.dataset.main:main"
