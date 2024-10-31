@@ -1,29 +1,28 @@
-import rosbag2_py
 import pandas as pd
-import rclpy.serialization
-from rclpy.serialization import deserialize_message
+import rosbag2_py
 from bitbots_msgs.msg import JointCommand
-import csv
+from rclpy.serialization import deserialize_message
 
 # Adjust message type and topic according to your setup
 MSG_TYPE = JointCommand  # Update if your message type is different
-TOPIC_NAME = '/DynamixelController/command'  # Adjust the topic name accordingly
+TOPIC_NAME = "/DynamixelController/command"  # Adjust the topic name accordingly
 
 # Currently only the legs are considered, as they come together and we need no interpolation
 JOINT_NAMES = [
-  "LHipYaw",
-  "LHipRoll",
-  "LHipPitch",
-  "LKnee",
-  "LAnklePitch",
-  "LAnkleRoll",
-  "RHipYaw",
-  "RHipRoll",
-  "RHipPitch",
-  "RKnee",
-  "RAnklePitch",
-  "RAnkleRoll",
+    "LHipYaw",
+    "LHipRoll",
+    "LHipPitch",
+    "LKnee",
+    "LAnklePitch",
+    "LAnkleRoll",
+    "RHipYaw",
+    "RHipRoll",
+    "RHipPitch",
+    "RKnee",
+    "RAnklePitch",
+    "RAnkleRoll",
 ]
+
 
 def read_rosbag(bag_path, topic_name):
     """
@@ -32,8 +31,8 @@ def read_rosbag(bag_path, topic_name):
     :param topic_name: The name of the topic to filter the messages
     :return: List of dictionaries containing the timestamp and message data
     """
-    storage_options = rosbag2_py.StorageOptions(uri=bag_path, storage_id='mcap')
-    converter_options = rosbag2_py.ConverterOptions('', '')  # Leave empty to use default conversion
+    storage_options = rosbag2_py.StorageOptions(uri=bag_path, storage_id="mcap")
+    converter_options = rosbag2_py.ConverterOptions("", "")  # Leave empty to use default conversion
 
     reader = rosbag2_py.SequentialReader()
     reader.open(storage_options, converter_options)
@@ -55,11 +54,13 @@ def read_rosbag(bag_path, topic_name):
         if topic == topic_name:
             msg = deserialize_message(data_bytes, MSG_TYPE)
             if set(JOINT_NAMES).issubset(set(msg.joint_names)):
-                data.append({
-                    'timestamp': timestamp
-                } | {name: msg.positions[msg.joint_names.index(name)] for name in JOINT_NAMES})
+                data.append(
+                    {"timestamp": timestamp}
+                    | {name: msg.positions[msg.joint_names.index(name)] for name in JOINT_NAMES}
+                )
 
     return data
+
 
 def write_to_csv(data, output_csv):
     """
@@ -72,10 +73,10 @@ def write_to_csv(data, output_csv):
     df.to_csv(output_csv)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Path to the MCAP bag file
-    bag_path = '/home/florian/Downloads/ID_amy_2023-07-08T12 56 52_0.mcap'  # Update with your actual bag file path
-    output_csv = 'joint_commands.csv'  # Output CSV file
+    bag_path = "/home/florian/Downloads/ID_amy_2023-07-08T12 56 52_0.mcap"  # Update with your actual bag file path
+    output_csv = "joint_commands.csv"  # Output CSV file
 
     # Extract joint command messages
     joint_command_data = read_rosbag(bag_path, TOPIC_NAME)
