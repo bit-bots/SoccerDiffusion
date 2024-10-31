@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 
+import typing
+
+if typing.TYPE_CHECKING:
+    from argparse import Namespace
+
 import os
 import sys
 
 from rich.console import Console
+from sqlalchemy.orm import Session
 
 from ddlitlab2024 import __version__
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.cli import CLIArgs, CLICommand
 from ddlitlab2024.dataset.db import Database
+from ddlitlab2024.dataset.recording2mcap import recording2mcap
 
 err_console = Console(stderr=True)
 
@@ -18,14 +25,18 @@ def main():
 
     try:
         logger.debug("Parsing CLI args...")
-        args: CLIArgs = CLIArgs().parse_args()
+        args: Namespace = CLIArgs().parse_args()
         if args.version:
             logger.info(f"running ddlitlab2024 CLI v{__version__}")
             sys.exit(0)
 
         if args.command == CLICommand.DB:
-            db = Database(args.db_path).create_session(args.create_schema)
+            create_schema = args.db_command == "create-schema"
+            db: Session = Database(args.db_path).create_session(create_schema=create_schema)
             logger.info(f"Database session created: {db}")
+
+            if args.db_command == "recording2mcap":
+                recording2mcap(db, args.recording, args.output)
 
         logger.info(f"CLI args: {args}")
         sys.exit(0)
