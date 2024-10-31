@@ -123,7 +123,7 @@ if __name__ == "__main__":
     )
 
     scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2")
-    scheduler.config.num_train_timesteps = train_timesteps
+    scheduler.config["num_train_timesteps"] = train_timesteps
 
     # Training loop
     for epoch in tqdm(range(epochs)):  # Number of training epochs
@@ -134,7 +134,9 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             # Sample a random timestep for each trajectory in the batch
-            random_timesteps = torch.randint(0, scheduler.config.num_train_timesteps, (batch_size,)).long().to(device)
+            random_timesteps = (
+                torch.randint(0, scheduler.config["num_train_timesteps"], (batch_size,)).long().to(device)
+            )
 
             # Sample noise to add to the entire trajectory
             noise = torch.randn_like(targets).to(device)

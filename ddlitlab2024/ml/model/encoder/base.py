@@ -4,23 +4,23 @@ from torch import nn
 from ddlitlab2024.ml.model.misc import PositionalEncoding
 
 
-class ActionHistoryEncoder(nn.Module):
+class BaseEncoder(nn.Module):
     """
-    Transformer encoder that encodes the action history of the robot.
+    Transformer encoder that encodes a sequence of input vectors into context tokens.
     """
 
-    def __init__(self, num_joints, hidden_dim, num_layers, num_heads, max_seq_len):
+    def __init__(self, input_dim: int, hidden_dim: int, num_layers: int, num_heads: int, max_seq_len: int):
         """
         Initializes the module.
 
-        :param num_joints: The number of joints in the robot.
+        :param input_dim: The number of input dimensions.
         :param hidden_dim: The number of hidden dimensions.
         :param num_layers: The number of transformer layers.
         :param num_heads: The number of attention heads.
         :param max_seq_len: The maximum length of the input sequences (used for positional encoding
         """
         super().__init__()
-        self.embedding = nn.Linear(num_joints, hidden_dim)
+        self.embedding = nn.Linear(input_dim, hidden_dim)
         self.positional_encoding = PositionalEncoding(hidden_dim, max_seq_len)
         self.transformer_encoder = nn.TransformerEncoder(
             nn.TransformerEncoderLayer(
@@ -34,14 +34,13 @@ class ActionHistoryEncoder(nn.Module):
             num_layers=num_layers,
         )
 
-    def forward(self, past_actions: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Encodes the past actions of the robot as context tokens.
+        Encodes the input vectors into context tokens.
 
-        :param past_actions: The past actions of the robot. Shape: (batch_size, seq_len, joint)
+        :param past_actions: The input vectors. Shape: (batch_size, seq_len, input_dim)
         :return: The encoded context tokens. Shape: (batch_size, seq_len, hidden_dim)
         """
-        x = past_actions
         # Embed the input
         x = self.embedding(x)
         # Positional encoding
