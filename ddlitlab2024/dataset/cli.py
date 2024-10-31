@@ -1,8 +1,6 @@
-import sys
+import argparse
 from enum import Enum
 from pathlib import Path
-
-from tap import Tap
 
 from ddlitlab2024 import DB_PATH
 
@@ -16,58 +14,26 @@ class CLICommand(str, Enum):
     IMPORT = "import"
 
 
-class DBArgs(Tap):
-    create_schema: bool = False
-
-    def configure(self) -> None:
-        self.add_argument(
-            "create_schema",
-            type=bool,
-            help="Create the base database schema, if it doesn't exist",
-            nargs="?",
-        )
-
-
-class ImportArgs(Tap):
-    import_type: ImportType
-    file: Path
-
-    def configure(self) -> None:
-        self.add_argument(
-            "import-type",
-            type=ImportType,
-            help="Type of import to perform",
-        )
-        self.add_argument(
-            "file",
-            type=Path,
-            help="File to import",
-        )
-
-
-class CLIArgs(Tap):
-    dry_run: bool = False
-    db_path: str = DB_PATH  # Path to the sqlite database file
-    version: bool = False  # if set print version and exit
-
+class CLIArgs:
     def __init__(self):
-        super().__init__(
-            description="ddlitlab dataset CLI",
-            underscores_to_dashes=True,
+        self.parser = argparse.ArgumentParser(description="ddlitlab dataset CLI")
+
+        self.parser.add_argument("--dry-run", action="store_true", help="Dry run")
+        self.parser.add_argument("--db-path", type=Path, default=DB_PATH, help="Path to the sqlite database file")
+        self.parser.add_argument("--version", action="store_true", help="Print version and exit")
+
+        subparsers = self.parser.add_subparsers(dest="command", help="Command to run")
+        import_parser = subparsers.add_parser(CLICommand.IMPORT.value, help="Import data into the database")
+
+        db_parser = subparsers.add_parser(CLICommand.DB.value, help="Database management commands")
+        db_subcommand_parser = db_parser.add_subparsers(dest="db_command", help="Database command")
+
+        db_subcommand_parser.add_parser("create-schema", help="Create the base database schema, if it doesn't exist.")
+        recording2mcap_subparser = db_subcommand_parser.add_parser(
+            "recording2mcap", help="Convert a recording to an mcap file"
         )
+        recording2mcap_subparser.add_argument("recording", type=str, help="Recording to convert")
+        recording2mcap_subparser.add_argument("output", type=Path, help="MCAP output file to write to")
 
-    def configure(self) -> None:
-        self.add_subparsers(dest="command", help="Command to run")
-        self.add_subparser(CLICommand.DB.value, DBArgs, help="Database management commands")
-        self.add_subparser(CLICommand.IMPORT.value, ImportArgs, help="Import data into the database")
-
-    def print_help_and_exit(self) -> None:
-        self.print_help()
-        sys.exit(0)
-
-    def process_args(self) -> None:
-        if self.command == CLICommand.DB:
-            all_args = (self.create_schema,)
-
-            if not any(all_args):
-                self.print_help_and_exit()
+    def parse_args(self) -> argparse.Namespace:
+        return self.parser.parse_args()
