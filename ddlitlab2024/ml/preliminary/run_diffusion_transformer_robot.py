@@ -45,7 +45,7 @@ model = TrajectoryTransformerModel(
 ema = EMA(model, beta=0.9999)
 
 scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2", clip_sample=False)
-scheduler.config.num_train_timesteps = train_timesteps
+scheduler.config["num_train_timesteps"] = train_timesteps
 
 # Load the model
 ema.load_state_dict(torch.load("trajectory_transformer_model.pth"))
