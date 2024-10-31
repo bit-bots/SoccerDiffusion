@@ -25,6 +25,7 @@ torchinfo = "^1.8.0"
 numpy = "^2.1.2"
 tqdm = "^4.66.5"
 ema-pytorch = "^0.7.3"
+rich = "^13.9.3"
 
 [tool.ruff]
 fix = true
