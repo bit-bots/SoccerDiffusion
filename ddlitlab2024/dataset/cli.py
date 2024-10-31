@@ -29,11 +29,17 @@ class CLIArgs:
         db_subcommand_parser = db_parser.add_subparsers(dest="db_command", help="Database command")
 
         db_subcommand_parser.add_parser("create-schema", help="Create the base database schema, if it doesn't exist.")
+
+        dummy_data_subparser = db_subcommand_parser.add_parser("dummy-data", help="Insert dummy data into the database")
+        dummy_data_subparser.add_argument(
+            "-n", "--num_recordings", type=int, default=10, help="Number of recordings to insert"
+        )
+
         recording2mcap_subparser = db_subcommand_parser.add_parser(
             "recording2mcap", help="Convert a recording to an mcap file"
         )
         recording2mcap_subparser.add_argument("recording", type=str, help="Recording to convert")
-        recording2mcap_subparser.add_argument("output", type=Path, help="MCAP output file to write to")
+        recording2mcap_subparser.add_argument("output_dir", type=Path, help="Output directory to write to")
 
     def parse_args(self) -> argparse.Namespace:
         return self.parser.parse_args()
