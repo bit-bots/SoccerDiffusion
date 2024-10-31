@@ -23,7 +23,7 @@ class CLIArgs:
         self.parser.add_argument("--version", action="store_true", help="Print version and exit")
 
         subparsers = self.parser.add_subparsers(dest="command", help="Command to run")
-        import_parser = subparsers.add_parser(CLICommand.IMPORT.value, help="Import data into the database")
+        # import_parser = subparsers.add_parser(CLICommand.IMPORT.value, help="Import data into the database")
 
         db_parser = subparsers.add_parser(CLICommand.DB.value, help="Database management commands")
         db_subcommand_parser = db_parser.add_subparsers(dest="db_command", help="Database command")
