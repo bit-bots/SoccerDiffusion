@@ -38,3 +38,5 @@ else:
 LOGGING_PATH: str = _logging_path
 
 SESSION_ID: UUID = uuid4()
+
+DB_PATH: str = os.path.join(os.path.dirname(__file__), "dataset", "db.sqlite3")
