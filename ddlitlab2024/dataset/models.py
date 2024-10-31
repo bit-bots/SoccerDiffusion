@@ -229,3 +229,9 @@ class GameState(Base):
     recording: Mapped["Recording"] = relationship("Recording", back_populates="game_states")
 
     __table_args__ = (CheckConstraint(state.in_(RobotState.values())),)
+
+
+def stamp_to_seconds_nanoseconds(stamp: float) -> tuple[int, int]:
+    seconds = int(stamp // 1)
+    nanoseconds = int((stamp % 1) * 1e9)
+    return seconds, nanoseconds

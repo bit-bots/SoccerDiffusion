@@ -1,7 +1,12 @@
 {
     "cSpell.words": [
+        "bigendian",
         "ddlitlab",
+        "mcap",
+        "nanosec",
         "nullable",
+        "rclpy",
+        "rosbag",
         "sessionmaker",
         "sqlalchemy",
         "sqlite"
