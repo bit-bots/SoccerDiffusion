@@ -6,7 +6,6 @@ from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, In
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 from sqlalchemy.types import LargeBinary
 
-
 Base = declarative_base()
 
 
