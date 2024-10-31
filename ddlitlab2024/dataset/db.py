@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -6,7 +8,7 @@ from ddlitlab2024.dataset.models import Base
 
 
 class Database:
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: Path):
         self.db_path = db_path
         self.engine: Engine = self._setup_sqlite()
         self.session: Session | None = None

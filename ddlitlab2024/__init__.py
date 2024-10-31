@@ -1,6 +1,7 @@
 import importlib.metadata
 import os
 import sys
+from pathlib import Path
 from uuid import UUID, uuid4
 
 _project_name: str = "ddlitlab2024"
@@ -39,4 +40,4 @@ LOGGING_PATH: str = _logging_path
 
 SESSION_ID: UUID = uuid4()
 
-DB_PATH: str = os.path.join(os.path.dirname(__file__), "dataset", "db.sqlite3")
+DB_PATH: Path = Path.joinpath(Path(__file__).parent, "dataset", "db.sqlite3")
