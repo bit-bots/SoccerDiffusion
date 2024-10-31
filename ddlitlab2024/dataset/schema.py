@@ -1,3 +1,4 @@
+import argparse
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional
@@ -6,6 +7,7 @@ from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, In
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship, sessionmaker
 from sqlalchemy.types import LargeBinary
 
+from ddlitlab2024 import DB_PATH
 from ddlitlab2024.dataset import logger
 
 Base = declarative_base()
@@ -229,9 +231,16 @@ class GameState(Base):
     __table_args__ = (CheckConstraint(state.in_(RobotState.values())),)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Create the database schema")
+    parser.add_argument("--db-path", type=str, default=DB_PATH, help="Path to the database file")
+    return parser.parse_args()
+
+
 def main():
     logger.info("Creating database schema")
-    engine = create_engine("sqlite:///data.sqlite")
+    args = parse_args()
+    engine = create_engine(f"sqlite:///{args.db_path}")
     Base.metadata.create_all(engine)
     sessionmaker(bind=engine)()
     logger.info("Database schema created")
