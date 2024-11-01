@@ -1,3 +1,4 @@
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -69,6 +70,46 @@ def get_writer(output: Path) -> rosbag2_py.SequentialWriter:
         ),
     )
     return writer
+
+
+def write_recording_info(recording: Recording, writer: rosbag2_py.SequentialWriter) -> None:
+    """Write the recording info as a JSON encoded String message to the mcap file
+
+    param recording: The recording
+    param writer: The mcap writer
+    """
+    # Create topic
+    writer.create_topic(
+        rosbag2_py.TopicMetadata(name="/recording", type="std_msgs/msg/String", serialization_format="cdr")
+    )
+
+    # Write recording info
+    logger.info("Writing recording info")
+    recording_info_msg = String(
+        data=json.dumps(
+            {
+                "id": recording._id,
+                "allow_public": recording.allow_public,
+                "original_file": recording.original_file,
+                "team_name": recording.team_name,
+                "team_color": recording.team_color,
+                "robot_type": recording.robot_type,
+                "start_time": recording.start_time,
+                "location": recording.location,
+                "simulated": recording.simulated,
+                "img_width": recording.img_width,
+                "img_height": recording.img_height,
+                "img_width_scaling": recording.img_width_scaling,
+                "img_height_scaling": recording.img_height_scaling,
+                "num_images": len(recording.images),
+                "num_rotations": len(recording.rotations),
+                "num_joint_states": len(recording.joint_states),
+                "num_joint_commands": len(recording.joint_commands),
+                "num_game_states": len(recording.game_states),
+            }
+        )
+    )
+    writer.write("/recording", serialize_message(recording_info_msg), 0)
 
 
 def write_images(recording: Recording, writer: rosbag2_py.SequentialWriter) -> None:
@@ -256,6 +297,7 @@ def recording2mcap(db: Session, recording_id_or_filename: str | int, output: Pat
     logger.info(f"Converting recording '{recording._id}' to mcap file '{output}'")
 
     writer = get_writer(output)
+    write_recording_info(recording, writer)
     write_images(recording, writer)
     write_rotations(recording, writer)
     write_joint_states(recording, writer)
