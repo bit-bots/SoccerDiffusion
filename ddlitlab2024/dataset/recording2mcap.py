@@ -53,6 +53,10 @@ def get_writer(output: Path) -> rosbag2_py.SequentialWriter:
     return: The mcap writer
     """
     if output.exists():
+        # Ask the user if they want to overwrite the existing file
+        if not input(f"Output directory '{output}' already exists. Overwrite? (y/n): ").lower().startswith("y"):
+            logger.info("Exiting")
+            sys.exit(0)
         # Remove the existing directory
         shutil.rmtree(output)
 
