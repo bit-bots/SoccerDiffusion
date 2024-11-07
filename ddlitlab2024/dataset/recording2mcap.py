@@ -94,7 +94,7 @@ def write_recording_info(recording: Recording, writer: rosbag2_py.SequentialWrit
                 "team_name": recording.team_name,
                 "team_color": recording.team_color,
                 "robot_type": recording.robot_type,
-                "start_time": recording.start_time,
+                "start_time": str(recording.start_time),
                 "location": recording.location,
                 "simulated": recording.simulated,
                 "img_width": recording.img_width,
