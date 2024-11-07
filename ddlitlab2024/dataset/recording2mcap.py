@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from ddlitlab2024.dataset import logger
-from ddlitlab2024.dataset.models import Recording, stamp_to_seconds_nanoseconds
+from ddlitlab2024.dataset.models import Recording, stamp_to_nanoseconds, stamp_to_seconds_nanoseconds
 
 try:
     import rosbag2_py
@@ -136,7 +136,7 @@ def write_images(recording: Recording, writer: rosbag2_py.SequentialWriter) -> N
             step=recording.img_width * 3,
             data=image.data,
         )
-        writer.write("/image", serialize_message(image_msg), int(image.stamp * 1_000_000_000))
+        writer.write("/image", serialize_message(image_msg), stamp_to_nanoseconds(image.stamp))
 
 
 def write_rotations(
@@ -162,7 +162,7 @@ def write_rotations(
             z=rotation.z,
             w=rotation.w,
         )
-        writer.write("/rotation", serialize_message(rotation_msg), int(rotation.stamp * 1_000_000_000))
+        writer.write("/rotation", serialize_message(rotation_msg), stamp_to_nanoseconds(rotation.stamp))
 
 
 def write_joint_states(
@@ -212,7 +212,7 @@ def write_joint_states(
             velocity=[0.0] * len(joints),
             effort=[0.0] * len(joints),
         )
-        writer.write("/joint_states", serialize_message(joint_state_msg), int(joint_state.stamp * 1_000_000_000))
+        writer.write("/joint_states", serialize_message(joint_state_msg), stamp_to_nanoseconds(joint_state.stamp))
 
 
 def write_joint_commands(
@@ -262,7 +262,7 @@ def write_joint_commands(
             velocity=[0.0] * len(joints),
             effort=[0.0] * len(joints),
         )
-        writer.write("/joint_commands", serialize_message(joint_command_msg), int(joint_command.stamp * 1_000_000_000))
+        writer.write("/joint_commands", serialize_message(joint_command_msg), stamp_to_nanoseconds(joint_command.stamp))
 
 
 def write_game_states(
@@ -283,7 +283,7 @@ def write_game_states(
     logger.info("Writing game states")
     for game_state in recording.game_states:
         game_state_msg = String(data=game_state.state)
-        writer.write("/game_state", serialize_message(game_state_msg), int(game_state.stamp * 1_000_000_000))
+        writer.write("/game_state", serialize_message(game_state_msg), stamp_to_nanoseconds(game_state.stamp))
 
 
 def recording2mcap(db: Session, recording_id_or_filename: str | int, output: Path) -> None:
@@ -303,6 +303,5 @@ def recording2mcap(db: Session, recording_id_or_filename: str | int, output: Pat
     write_joint_states(recording, writer)
     write_joint_commands(recording, writer)
     write_game_states(recording, writer)
-    del writer
 
     logger.info(f"Recording '{recording._id}' converted to mcap file '{output}'")
