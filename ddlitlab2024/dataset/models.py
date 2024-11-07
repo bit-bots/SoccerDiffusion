@@ -2,6 +2,7 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
+import numpy as np
 from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 from sqlalchemy.types import LargeBinary
@@ -86,6 +87,12 @@ class Image(Base):
     recording: Mapped["Recording"] = relationship("Recording", back_populates="images")
 
     __table_args__ = (CheckConstraint("stamp >= 0"),)
+
+    def __init__(self, stamp: float, recording_id: int, image: np.ndarray):
+        assert image.dtype == np.uint8, "Image must be of type np.uint8"
+        assert image.shape[2] == 3, "Image must have 3 channels"
+        assert image.ndim == 3, "Image must have 3 dimensions"
+        super().__init__(stamp=stamp, recording_id=recording_id, data=image.tobytes())
 
 
 class Rotation(Base):
