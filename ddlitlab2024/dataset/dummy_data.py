@@ -183,9 +183,7 @@ def insert_game_states(db: Session, recording_ids: list[int], n: int) -> None:
             )
 
 
-def insert_dummy_data(
-    db: Session, num_recordings: int = 5, num_samples_per_rec: int = 72000, image_step: int = 10
-) -> None:
+def insert_dummy_data(db: Session, num_recordings: int, num_samples_per_rec: int, image_step: int) -> None:
     logger.info("Inserting dummy data...")
     recording_ids: list[int] = insert_recordings(db, num_recordings)
     insert_images(db, recording_ids, num_samples_per_rec, image_step)
