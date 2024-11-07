@@ -47,23 +47,23 @@ def get_recording(db: Session, recording_id_or_filename: str | int) -> Recording
         raise TypeError("Recording ID must be an integer or string")
 
 
-def get_writer(output: Path) -> rosbag2_py.SequentialWriter:
+def get_writer(output_dir: Path) -> rosbag2_py.SequentialWriter:
     """Get the mcap writer.
 
-    param output: The output mcap file
+    param output_dir: The output directory
     return: The mcap writer
     """
-    if output.exists():
+    if output_dir.exists():
         # Ask the user if they want to overwrite the existing file
-        if not input(f"Output directory '{output}' already exists. Overwrite? (y/n): ").lower().startswith("y"):
+        if not input(f"Output directory '{output_dir}' already exists. Overwrite? (y/n): ").lower().startswith("y"):
             logger.info("Exiting")
             sys.exit(0)
         # Remove the existing directory
-        shutil.rmtree(output)
+        shutil.rmtree(output_dir)
 
     writer = rosbag2_py.SequentialWriter()
     writer.open(
-        rosbag2_py.StorageOptions(uri=str(output), storage_id="mcap"),
+        rosbag2_py.StorageOptions(uri=str(output_dir), storage_id="mcap"),
         rosbag2_py.ConverterOptions(
             input_serialization_format="cdr",
             output_serialization_format="cdr",
