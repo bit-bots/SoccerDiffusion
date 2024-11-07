@@ -235,3 +235,7 @@ def stamp_to_seconds_nanoseconds(stamp: float) -> tuple[int, int]:
     seconds = int(stamp // 1)
     nanoseconds = int((stamp % 1) * 1e9)
     return seconds, nanoseconds
+
+
+def stamp_to_nanoseconds(stamp: float) -> int:
+    return int(stamp * 1e9)
