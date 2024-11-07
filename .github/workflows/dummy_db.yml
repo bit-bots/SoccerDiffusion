@@ -1,4 +1,4 @@
-name: Test Database Creation
+name: Create DB with dummy data
 
 on:
   push:
@@ -29,5 +29,8 @@ jobs:
     - name: Install dependencies
       run: poetry install
 
-    - name: Run create-db
-      run: poetry run cli db create_schema
+    - name: Create DB schema
+      run: poetry run cli db create-schema
+
+    - name: Populate DB with dummy data
+      run: poetry run cli db dummy-data -n 2

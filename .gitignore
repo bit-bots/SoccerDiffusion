@@ -3,6 +3,8 @@ logs/
 *.csv
 *.sqlite
 *.sqlite3
+*.mcap
+*/metadata.yaml
 
 # Created by .ignore support plugin (hsz.mobi)
 ### JetBrains template
