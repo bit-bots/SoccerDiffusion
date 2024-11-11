@@ -90,8 +90,8 @@ class Image(Base):
 
     def __init__(self, stamp: float, recording_id: int, image: np.ndarray):
         assert image.dtype == np.uint8, "Image must be of type np.uint8"
-        assert image.shape[2] == 3, "Image must have 3 channels"
         assert image.ndim == 3, "Image must have 3 dimensions"
+        assert image.shape[2] == 3, "Image must have 3 channels"
         super().__init__(stamp=stamp, recording_id=recording_id, data=image.tobytes())
 
 
