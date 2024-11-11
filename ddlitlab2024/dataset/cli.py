@@ -34,6 +34,10 @@ class CLIArgs:
         dummy_data_subparser.add_argument(
             "-n", "--num_recordings", type=int, default=10, help="Number of recordings to insert"
         )
+        dummy_data_subparser.add_argument(
+            "-s", "--num_samples_per_rec", type=int, default=72000, help="Number of samples per recording"
+        )
+        dummy_data_subparser.add_argument("-i", "--image_step", type=int, default=10, help="Step size for images")
 
         recording2mcap_subparser = db_subcommand_parser.add_parser(
             "recording2mcap", help="Convert a recording to an mcap file"
