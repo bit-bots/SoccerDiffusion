@@ -5,6 +5,7 @@ import random
 import cv2
 import numpy as np
 from sqlalchemy.orm import Session
+from tqdm import tqdm
 
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.models import (
@@ -68,7 +69,7 @@ def insert_images(db: Session, recording_ids: list[int], n: int, step: int) -> N
         cv2.putText(img, f"{timestamp:.2f}", (10, height - 10), font, 1, (255, 255, 255), 2, cv2.LINE_AA)
         return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-    for recording_id in recording_ids:
+    for recording_id in tqdm(recording_ids):
         # Get width and height from the recording
         recording = db.query(Recording).get(recording_id)
         if recording is None:
@@ -85,7 +86,7 @@ def insert_images(db: Session, recording_ids: list[int], n: int, step: int) -> N
 
 def insert_rotations(db: Session, recording_ids: list[int], n: int, speed=0.1) -> None:
     logger.info("Generating rotations...")
-    for recording_id in recording_ids:
+    for recording_id in tqdm(recording_ids):
         x_shift = random.random()
         y_shift = random.random()
         z_shift = random.random()
@@ -106,7 +107,7 @@ def insert_rotations(db: Session, recording_ids: list[int], n: int, speed=0.1) -
 
 def insert_joint_states(db: Session, recording_ids: list[int], n: int, speed: float = 0.2) -> None:
     logger.info("Generating joint states...")
-    for recording_id in recording_ids:
+    for recording_id in tqdm(recording_ids):
         offsets = [random.random() for _ in range(20)]
         for i in range(n):
             db.add(
@@ -139,12 +140,12 @@ def insert_joint_states(db: Session, recording_ids: list[int], n: int, speed: fl
 
 def insert_joint_commands(db: Session, recording_ids: list[int], n: int, speed: float = 0.2) -> None:
     logger.info("Generating joint commands...")
-    for recording_id in recording_ids:
+    for recording_id in tqdm(recording_ids):
         offsets = [random.random() for _ in range(20)]
         for i in range(n):
             db.add(
                 JointCommand(
-                    stamp=1 / 100,
+                    stamp=i / 100,
                     recording_id=recording_id,
                     r_shoulder_pitch=math.sin(speed * i + offsets[0]) + math.pi,
                     l_shoulder_pitch=math.sin(speed * i + offsets[1]) + math.pi,
@@ -172,7 +173,7 @@ def insert_joint_commands(db: Session, recording_ids: list[int], n: int, speed: 
 
 def insert_game_states(db: Session, recording_ids: list[int], n: int) -> None:
     logger.info("Generating game states...")
-    for recording_id in recording_ids:
+    for recording_id in tqdm(recording_ids):
         for i in range(n):
             db.add(
                 GameState(
