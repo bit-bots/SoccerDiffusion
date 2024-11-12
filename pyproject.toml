@@ -30,6 +30,7 @@ tqdm = "^4.66.5"
 transforms3d = "^0.4.2"
 typed-argument-parser = "^1.10.1"
 mcap = "^1.2.1"
+opencv-python = "^4.10.0.84"
 
 [tool.ruff]
 fix = true
