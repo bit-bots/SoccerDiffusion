@@ -33,4 +33,4 @@ jobs:
       run: poetry run cli db create-schema
 
     - name: Populate DB with dummy data
-      run: poetry run cli db dummy-data -n 2
+      run: poetry run cli db dummy-data -n 2 -s 100 -i 10

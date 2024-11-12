@@ -45,7 +45,7 @@ def main():
                 case "dummy-data":
                     from ddlitlab2024.dataset.dummy_data import insert_dummy_data
 
-                    insert_dummy_data(db, args.num_recordings)
+                    insert_dummy_data(db, args.num_recordings, args.num_samples_per_rec, args.image_step)
 
         sys.exit(0)
     except Exception as e:
