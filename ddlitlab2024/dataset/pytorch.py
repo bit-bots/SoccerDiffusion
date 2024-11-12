@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 import os
-import torch
-import numpy as np
-
-from torch.utils.data import Dataset, DataLoader
 import sqlite3
+from typing import Literal
+
+import numpy as np
 import pandas as pd
-from ddlitlab2024.dataset.models import JointCommand, JointState, Recording
+import torch
+from torch.utils.data import Dataset
 
 
 class DDLITLab2024Dataset(Dataset):
@@ -75,6 +75,82 @@ class DDLITLab2024Dataset(Dataset):
     def __len__(self):
         return self.num_samples
 
+    def query_joint_data(
+        self, recording_id: int, start_sample: int, num_samples: int, table: Literal["JointCommand", "JointState"]
+    ) -> torch.Tensor:
+        # Get the joint state
+        raw_joint_data = pd.read_sql_query(
+            f"SELECT * FROM {table} WHERE recording_id = {recording_id} "
+            f"ORDER BY stamp ASC LIMIT {num_samples} OFFSET {start_sample}",
+            # TODO other direction  TODO make params correct
+            self.db_connection,
+        )
+
+        # Convert to numpy array, keep only the joint angle columns (np.float32 type)
+        raw_joint_data = raw_joint_data.drop(columns=["_id", "stamp", "recording_id"]).to_numpy(dtype=np.float32)
+
+        # We don't need padding here, because we sample the data in the correct length for the targets
+        return torch.from_numpy(raw_joint_data)
+
+    def query_joint_data_history(
+        self, recording_id: int, end_sample: int, num_samples: int, table: Literal["JointCommand", "JointState"]
+    ) -> torch.Tensor:
+        # Handle lower bound
+        start_sample = max(0, end_sample - num_samples)
+        num_samples = end_sample - start_sample
+
+        # Get the joint data
+        raw_joint_data = self.query_joint_data(recording_id, start_sample, num_samples, table)
+
+        # Pad the data if necessary, for the input data / history it might be necessary
+        # during the startup / first samples
+        # Zero pad the joint state if the number of samples is less than the required number of samples
+        if raw_joint_data.shape[0] < num_samples:
+            raw_joint_data = torch.cat(
+                (
+                    torch.zeros(
+                        (num_samples - raw_joint_data.shape[0], raw_joint_data.shape[1]), dtype=raw_joint_data.dtype
+                    ),
+                    raw_joint_data,
+                ),
+                dim=0,
+            )
+            assert raw_joint_data.shape[0] == num_samples, "The padded array is not the correct shape"
+            assert raw_joint_data[0, 0] == 0.0, "The array is not zero padded"
+
+        return raw_joint_data
+
+    def query_image_data(
+        self, recording_id: int, end_sample: int, num_samples: int
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        # Handle lower bound
+        start_sample = max(0, end_sample - num_samples)
+        num_samples = end_sample - start_sample
+
+        # Get the image data
+        cursor = self.db_connection.cursor()
+        cursor.execute(
+            "SELECT stamp, data FROM Image WHERE recording_id = $1 ORDER BY stamp ASC LIMIT $2 OFFSET $3",
+            (recording_id, num_samples, start_sample),
+        )
+
+        stamps = []
+        image_data = []
+
+        # Get the raw image data
+        for stamp, data in cursor:
+            # Deserialize the image data
+            image_data.append(np.frombuffer(data, dtype=np.uint8).reshape(480, 480, 3))
+            stamps.append(stamp)
+
+        # Convert to tensor
+        image_data = torch.from_numpy(np.stack(image_data, axis=0))
+        stamps = torch.tensor(stamps)
+
+        # TODO maybe add padding if the number of samples is less than the required number of samples
+
+        return stamps, image_data
+
     def __getitem__(self, idx):
         # Find the recording that contains the sample
         for start_sample, end_sample, recording_id in self.sample_boundaries:
@@ -85,20 +161,32 @@ class DDLITLab2024Dataset(Dataset):
         recording_id, start_sample = boundary
 
         # Calculate the sample index in the recording
-        sample_index = idx - start_sample
+        sample_index = int(idx - start_sample)
 
-        # Get the joint command
-        raw_joint_command = pd.read_sql_query(
-            f"SELECT * FROM JointCommand WHERE recording_id = {recording_id} ORDER BY stamp ASC LIMIT {self.num_samples_joint_trajectory_future} OFFSET {sample_index}",
-            self.db_connection,
+        # Get the joint command target (future)
+        joint_command = self.query_joint_data(
+            recording_id, sample_index, self.num_samples_joint_trajectory_future, "JointCommand"
         )
 
-        # TODO make index CREATE INDEX idx_recording_stamp_joint_command ON JointCommand(recording_id, stamp)
+        # Get the joint command history
+        joint_command_history = self.query_joint_data_history(
+            recording_id, sample_index, self.num_samples_joint_trajectory, "JointCommand"
+        )
 
-        # Convert to numpy array, keep only the joint angle columns (np.float32 type)
-        raw_joint_command = raw_joint_command.drop(columns=["stamp", "recording_id"]).to_numpy(dtype=np.float32)
+        # Get the joint state
+        joint_state = self.query_joint_data_history(
+            recording_id, sample_index, self.num_samples_joint_states, "JointState"
+        )
 
-        return torch.from_numpy(raw_joint_command)
+        # Get the robot rotation (IMU data)
+        # robot_rotation = self.
+
+        # Get the image data
+        image_stamps, image_data = self.query_image_data(recording_id, sample_index, self.num_frames_video)
+
+        # TODO image data, imu data, ...
+
+        return joint_command, joint_command_history, joint_state, image_data, image_stamps
 
 
 # Some dummy code to test the dataset
@@ -115,15 +203,24 @@ if __name__ == "__main__":
     # Plot the first sample
     import matplotlib.pyplot as plt
 
+    indices = np.random.choice(len(dataset), 100)
+
     import time
 
     time1 = time.time()
-    for i, _ in enumerate(dataset):
-        if i == 10:
-            break
+    for i in indices:
+        sample = dataset[i]
 
-    print((time.time() - time1) / 10)
+    print(time.time() - time1)
 
-    # print(len(sample))
-    # plt.plot(sample["stamp"], sample["LKnee"])
-    # plt.show()
+    print(sample)
+
+    print(len(sample))
+    # Plot joint history and future
+    plt.plot(range(100, 110), sample[0].numpy(), label="Future")
+    plt.plot(range(100), sample[1].numpy(), label="History")
+    plt.legend()
+    plt.show()
+
+    plt.imshow(np.hstack(sample[3].numpy()))
+    plt.show()
