@@ -7,11 +7,7 @@ name = "ddlitlab2024"
 version = "0.0.1"
 readme = "README.md"
 repository = "https://github.com/bit-bots/ddlitlab2024"
-authors = [
-  "Florian Vahl",
-  "Jan Gutsche",
-  "Joern Griepenburg",
-]
+authors = ["Florian Vahl", "Jan Gutsche", "Joern Griepenburg"]
 description = ""
 
 [tool.poetry.dependencies]
@@ -49,4 +45,4 @@ line-length = 120
 select = ["F", "E", "B", "W", "I", "N", "UP"]
 
 [tool.poetry.scripts]
-cli = "ddlitlab2024.dataset.main:main"
+cli = "ddlitlab2024.dataset.cli.run:main"
