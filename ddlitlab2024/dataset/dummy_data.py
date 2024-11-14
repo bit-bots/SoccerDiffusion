@@ -36,7 +36,6 @@ def insert_recordings(db_session: Session, n) -> list[int]:
                 img_height_scaling=1.0,
             ),
         )
-    db_session.flush()  # Ensure the recording is written to the database and the ID is generated
     recording = db_session.query(Recording).order_by(Recording._id.desc()).limit(n).all()
     if recording is None:
         raise ValueError("Failed to insert recordings")

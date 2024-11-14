@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ddlitlab2024.dataset.db import Database
-from ddlitlab2024.dataset.models import GameState, JointCommands, JointStates, Recording
+from ddlitlab2024.dataset.models import GameState, Image, JointCommands, JointStates, Recording
 
 
 @dataclass
@@ -21,6 +21,7 @@ class ModelData:
     game_states: list[GameState] = field(default_factory=list)
     joint_states: list[JointStates] = field(default_factory=list)
     joint_commands: list[JointCommands] = field(default_factory=list)
+    images: list[Image] = field(default_factory=list)
 
     def model_instances(self):
         return [self.recording] + self.game_states + self.joint_states + self.joint_commands

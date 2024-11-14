@@ -9,6 +9,8 @@ from sqlalchemy.types import LargeBinary
 
 Base = declarative_base()
 
+DEFAULT_IMG_SIZE = (480, 480)
+
 
 class RobotState(str, Enum):
     POSITIONING = "POSITIONING"
@@ -51,8 +53,9 @@ class Recording(Base):
     end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     simulated: Mapped[bool] = mapped_column(Boolean, default=False)
-    img_width: Mapped[int] = mapped_column(Integer, default=480)
-    img_height: Mapped[int] = mapped_column(Integer, default=480)
+    img_width: Mapped[int] = mapped_column(Integer, default=DEFAULT_IMG_SIZE[0])
+    img_height: Mapped[int] = mapped_column(Integer, default=DEFAULT_IMG_SIZE[1])
+    # Scaling factors for original image size to img_width x img_height
     img_width_scaling: Mapped[float] = mapped_column(Float, nullable=False)
     img_height_scaling: Mapped[float] = mapped_column(Float, nullable=False)
 
@@ -84,17 +87,26 @@ class Image(Base):
     _id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     stamp: Mapped[float] = mapped_column(Float, nullable=False)
     recording_id: Mapped[int] = mapped_column(Integer, ForeignKey("Recording._id"), nullable=False)
+    # The image data should contain the image as bytes using an rgb8 format (3 channels) and uint8 type.
+    # and should be of size (img_width, img_height) as specified in the recording (default 480x480)
     data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
 
     recording: Mapped["Recording"] = relationship("Recording", back_populates="images")
 
     __table_args__ = (CheckConstraint("stamp >= 0"),)
 
-    def __init__(self, stamp: float, recording_id: int, image: np.ndarray):
+    def __init__(
+        self, stamp: float, image: np.ndarray, recording_id: int | None = None, recording: Recording | None = None
+    ):
         assert image.dtype == np.uint8, "Image must be of type np.uint8"
         assert image.ndim == 3, "Image must have 3 dimensions"
         assert image.shape[2] == 3, "Image must have 3 channels"
-        super().__init__(stamp=stamp, recording_id=recording_id, data=image.tobytes())
+        assert recording_id is not None or recording is not None, "Either id of recording or recording must be provided"
+
+        if recording is None:
+            super().__init__(stamp=stamp, recording_id=recording_id, data=image.tobytes())
+        else:
+            super().__init__(stamp=stamp, recording=recording, data=image.tobytes())
 
 
 class Rotation(Base):
