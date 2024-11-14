@@ -23,7 +23,7 @@ except ImportError:
     sys.exit(1)
 
 
-def get_recording(db: Session, recording_id_or_filename: str | int) -> Recording:
+def get_recording(db_session: Session, recording_id_or_filename: str | int) -> Recording:
     """Get the recording from the input string or integer
 
     param db: The database
@@ -34,12 +34,12 @@ def get_recording(db: Session, recording_id_or_filename: str | int) -> Recording
     if isinstance(recording_id_or_filename, int) or recording_id_or_filename.isdigit():
         # Verify that the recording exists
         recording_id = int(recording_id_or_filename)
-        recording = db.query(Recording).get(recording_id)
+        recording = db_session.query(Recording).get(recording_id)
         if recording is None:
             raise ValueError(f"Recording '{recording_id}' not found")
         return recording
     elif isinstance(recording_id_or_filename, str):
-        recording = db.query(Recording).filter(Recording.original_file == recording_id_or_filename).first()
+        recording = db_session.query(Recording).filter(Recording.original_file == recording_id_or_filename).first()
         if recording is None:
             raise ValueError(f"Recording with original filename '{recording_id_or_filename}' not found")
         return recording
@@ -286,14 +286,14 @@ def write_game_states(
         writer.write("/game_state", serialize_message(game_state_msg), stamp_to_nanoseconds(game_state.stamp))
 
 
-def recording2mcap(db: Session, recording_id_or_filename: str | int, output: Path) -> None:
+def recording2mcap(db_session: Session, recording_id_or_filename: str | int, output: Path) -> None:
     """Convert a recording to an mcap file
 
     param db: The database
     param recording_id_or_filename: The recording ID or original filename
     param output: The output mcap file
     """
-    recording = get_recording(db, recording_id_or_filename)
+    recording = get_recording(db_session, recording_id_or_filename)
     logger.info(f"Converting recording '{recording._id}' to mcap file '{output}'")
 
     writer = get_writer(output)
