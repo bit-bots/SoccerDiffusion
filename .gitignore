@@ -209,3 +209,6 @@ ENV/
 
 # Torch models
 *.pth
+
+# rosbag/data input folder
+input/
