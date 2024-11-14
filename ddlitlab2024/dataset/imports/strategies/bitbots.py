@@ -3,13 +3,24 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
+import cv2
+import numpy as np
 from mcap.reader import make_reader
 from mcap.summary import Summary
 from mcap_ros2.decoder import DecoderFactory
 
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.imports.model_importer import ImportMetadata, ImportStrategy, ModelData
-from ddlitlab2024.dataset.models import GameState, JointCommands, JointStates, Recording, RobotState, TeamColor
+from ddlitlab2024.dataset.models import (
+    DEFAULT_IMG_SIZE,
+    GameState,
+    Image,
+    JointCommands,
+    JointStates,
+    Recording,
+    RobotState,
+    TeamColor,
+)
 from ddlitlab2024.utils.utils import camelcase_to_snakecase, shift_radian_to_positive_range
 
 DATETIME_FORMAT = "%d.%m-%Y %H:%M:%S"
@@ -149,8 +160,29 @@ class BitBotsImportStrategy(ImportStrategy):
                         model_data.joint_commands.append(
                             self.create_joint_commands(ros_msg, relative_timestamp, model_data.recording)
                         )
+                    case "/camera/image_proc" | "/camera/image_raw":
+                        model_data.recording.img_width_scaling = DEFAULT_IMG_SIZE[0] / ros_msg.width
+                        model_data.recording.img_height_scaling = DEFAULT_IMG_SIZE[1] / ros_msg.height
+                        model_data.images.append(self.create_image(ros_msg, relative_timestamp, model_data.recording))
 
         return model_data
+
+    def create_image(self, msg, relative_timestamp: float, recording: Recording) -> Image:
+        img_array = np.frombuffer(msg.data, np.uint8).reshape((msg.height, msg.width, 3))
+
+        will_img_be_upscaled = recording.img_width_scaling > 1.0 or recording.img_height_scaling > 1.0
+        interpolation = cv2.INTER_AREA
+        if will_img_be_upscaled:
+            interpolation = cv2.INTER_CUBIC
+
+        resized_img = cv2.resize(img_array, (recording.img_width, recording.img_height), interpolation=interpolation)
+        resized_rgb_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
+
+        return Image(
+            stamp=relative_timestamp,
+            recording=recording,
+            image=resized_rgb_img,
+        )
 
     def create_recording(self, summary: Summary, mcap_file_path: Path) -> Recording:
         start_timestamp, end_timestamp = self.extract_timeframe(summary)
@@ -164,6 +196,8 @@ class BitBotsImportStrategy(ImportStrategy):
             end_time=datetime.fromtimestamp(end_timestamp / 1e9),
             location=self.metadata.location,
             simulated=self.metadata.simulated,
+            img_width=DEFAULT_IMG_SIZE[0],
+            img_height=DEFAULT_IMG_SIZE[1],
             # needs to be overwritten when processing images
             img_width_scaling=0.0,
             img_height_scaling=0.0,
