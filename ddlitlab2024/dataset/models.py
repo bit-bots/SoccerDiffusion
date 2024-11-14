@@ -48,6 +48,7 @@ class Recording(Base):
     team_color: Mapped[Optional[TeamColor]] = mapped_column(String, nullable=True)
     robot_type: Mapped[str] = mapped_column(String, nullable=False)
     start_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     simulated: Mapped[bool] = mapped_column(Boolean, default=False)
     img_width: Mapped[int] = mapped_column(Integer, default=480)
@@ -73,6 +74,7 @@ class Recording(Base):
         CheckConstraint(img_width > 0),
         CheckConstraint(img_height > 0),
         CheckConstraint(team_color.in_(TeamColor.values())),
+        CheckConstraint("end_time >= start_time"),
     )
 
 
