@@ -10,8 +10,8 @@ from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.models import (
     GameState,
     Image,
-    JointCommand,
-    JointState,
+    JointCommands,
+    JointStates,
     Recording,
     RobotState,
     Rotation,
@@ -109,8 +109,8 @@ def insert_joint_states(db: Session, recording_ids: list[int], n: int, speed: fl
     for recording_id in recording_ids:
         offsets = [random.random() for _ in range(20)]
         for i in range(n):
-            db.add(
-                JointState(
+            db_session.add(
+                JointStates(
                     stamp=i / 100,
                     recording_id=recording_id,
                     r_shoulder_pitch=math.sin(speed * i + offsets[0]) + math.pi,
@@ -142,8 +142,8 @@ def insert_joint_commands(db: Session, recording_ids: list[int], n: int, speed: 
     for recording_id in recording_ids:
         offsets = [random.random() for _ in range(20)]
         for i in range(n):
-            db.add(
-                JointCommand(
+            db_session.add(
+                JointCommands(
                     stamp=1 / 100,
                     recording_id=recording_id,
                     r_shoulder_pitch=math.sin(speed * i + offsets[0]) + math.pi,
