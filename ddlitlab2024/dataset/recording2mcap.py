@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from ddlitlab2024.dataset import logger
-from ddlitlab2024.dataset.models import Recording, stamp_to_nanoseconds, stamp_to_seconds_nanoseconds
+from ddlitlab2024.dataset.models import JointStates, Recording, stamp_to_nanoseconds, stamp_to_seconds_nanoseconds
 
 try:
     import rosbag2_py
@@ -233,7 +233,7 @@ def write_joint_commands(
     logger.info("Writing joint commands")
     for joint_command in recording.joint_commands:
         seconds, nanoseconds = stamp_to_seconds_nanoseconds(joint_command.stamp)
-        joints: list[tuple[str, float]] = [
+        joints: list[tuple[str, float | None]] = [
             ("r_shoulder_pitch", joint_command.r_shoulder_pitch),
             ("l_shoulder_pitch", joint_command.l_shoulder_pitch),
             ("r_shoulder_roll", joint_command.r_shoulder_roll),
@@ -255,7 +255,7 @@ def write_joint_commands(
             ("head_pan", joint_command.head_pan),
             ("head_tilt", joint_command.head_tilt),
         ]
-        joint_command_msg = JointState(
+        joint_command_msg = JointStates(
             header=Header(stamp=Time(sec=seconds, nanosec=nanoseconds), frame_id="base_link"),
             name=[name for name, _ in joints],
             position=[position for _, position in joints],

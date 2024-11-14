@@ -60,11 +60,11 @@ class Recording(Base):
     rotations: Mapped[List["Rotation"]] = relationship(
         "Rotation", back_populates="recording", cascade="all, delete-orphan"
     )
-    joint_states: Mapped[List["JointState"]] = relationship(
-        "JointState", back_populates="recording", cascade="all, delete-orphan"
+    joint_states: Mapped[List["JointStates"]] = relationship(
+        "JointStates", back_populates="recording", cascade="all, delete-orphan"
     )
-    joint_commands: Mapped[List["JointCommand"]] = relationship(
-        "JointCommand", back_populates="recording", cascade="all, delete-orphan"
+    joint_commands: Mapped[List["JointCommands"]] = relationship(
+        "JointCommands", back_populates="recording", cascade="all, delete-orphan"
     )
     game_states: Mapped[List["GameState"]] = relationship(
         "GameState", back_populates="recording", cascade="all, delete-orphan"
@@ -119,8 +119,8 @@ class Rotation(Base):
     )
 
 
-class JointState(Base):
-    __tablename__ = "JointState"
+class JointStates(Base):
+    __tablename__ = "JointStates"
 
     _id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     stamp: Mapped[float] = mapped_column(Float, nullable=False)
@@ -173,8 +173,8 @@ class JointState(Base):
     )
 
 
-class JointCommand(Base):
-    __tablename__ = "JointCommand"
+class JointCommands(Base):
+    __tablename__ = "JointCommands"
 
     _id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     stamp: Mapped[float] = mapped_column(Float, nullable=False)
