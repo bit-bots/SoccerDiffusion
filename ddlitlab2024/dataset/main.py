@@ -2,6 +2,9 @@
 
 import typing
 
+from ddlitlab2024.dataset.imports.model_importer import ImportMetadata, ModelImporter
+from ddlitlab2024.dataset.imports.strategies.bitbots import BitBotsImportStrategy
+
 if typing.TYPE_CHECKING:
     from argparse import Namespace
 
@@ -14,7 +17,6 @@ from ddlitlab2024 import __version__
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.cli import CLIArgs, CLICommand, ImportType
 from ddlitlab2024.dataset.db import Database
-from ddlitlab2024.dataset.mappers.rosbag_mapper import RosBagToModelMapper
 
 err_console = Console(stderr=True)
 
@@ -48,7 +50,16 @@ def main():
 
         elif args.type == ImportType.ROS_BAG:
             db: Database = Database(args.db_path).create_session()
-            RosBagToModelMapper(args.file, db).read()
+            logger.info(f"Trying to import file '{args.file}' to database...")
+            metadata = ImportMetadata(
+                allow_public=True,
+                team_name="Bit-Bots",
+                robot_type="Wolfgang-OP",
+                location="RoboCup2024",
+                simulated=False,
+            )
+            importer = ModelImporter(db, BitBotsImportStrategy(metadata))
+            importer.import_to_db(args.file)
 
         sys.exit(0)
     except Exception as e:

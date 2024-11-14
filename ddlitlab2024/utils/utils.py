@@ -44,6 +44,16 @@ def wxyz2xyzw(quat: np.ndarray) -> np.ndarray:
     return np.roll(quat, -1, axis=-1)
 
 
+def shift_radian_to_positive_range(radian: float) -> float:
+    """
+    Shift a principal range radian [-pi, pi] to the positive principal range [0, 2pi].
+
+    :param radian: The pricipal range radian radian [-pi, pi].
+    :return: The positive principal range radian [0, 2pi].
+    """
+    return (radian + 2 * np.pi) % (2 * np.pi)
+
+
 def timestamp_in_ns(seconds: int, nanoseconds: int) -> int:
     """
     Convert a combined unix timestamp from seconds and nanoseconds to timestamp in nanoseconds.

@@ -1,16 +1,16 @@
+from contextlib import contextmanager
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
-import numpy as np
-from mcap.reader import McapReader, make_reader
+from mcap.reader import make_reader
 from mcap.summary import Summary
 from mcap_ros2.decoder import DecoderFactory
 
 from ddlitlab2024.dataset import logger
-from ddlitlab2024.dataset.db import Database
+from ddlitlab2024.dataset.imports.model_importer import ImportMetadata, ImportStrategy, ModelData
 from ddlitlab2024.dataset.models import GameState, JointCommands, JointStates, Recording, RobotState, TeamColor
-from ddlitlab2024.utils.utils import camelcase_to_snakecase
+from ddlitlab2024.utils.utils import camelcase_to_snakecase, shift_radian_to_positive_range
 
 DATETIME_FORMAT = "%d.%m-%Y %H:%M:%S"
 
@@ -113,69 +113,57 @@ USED_TOPICS = [
 ]
 
 
-class RosBagToModelMapper:
-    def __init__(self, rosbag_path: Path, db: Database):
-        self.bag_path: Path = rosbag_path
-        self.db: Database = db
-        self.first_used_message_time: int | None = None
-        self.models = {}
+class BitBotsImportStrategy(ImportStrategy):
+    def __init__(self, metadata: ImportMetadata):
+        self.metadata = metadata
 
-    def read(self):
-        with open(self.bag_path, "rb") as f:
-            reader: McapReader = make_reader(f, decoder_factories=[DecoderFactory()])
+    def convert_to_model_data(self, file_path: Path) -> ModelData:
+        with self._mcap_reader(file_path) as reader:
             summary: Summary | None = reader.get_summary()
 
             if summary is None:
                 logger.error("No summary found in the MCAP file, skipping processing.")
-                return
+                return ModelData()
 
-            recording: Recording = self.create_recording(summary)
-            self.models = {
-                "recording": recording,
-                "game_states": [],
-                "joint_states": [],
-                "joint_commands": [],
-            }
-            self._log_debug_info(summary, recording)
+            first_used_msg_time = None
+            model_data = ModelData(recording=self.create_recording(summary, file_path))
+            assert model_data.recording is not None, "Recording is not set"
+
+            self._log_debug_info(summary, model_data.recording)
 
             for _, channel, message, ros_msg in reader.iter_decoded_messages(topics=USED_TOPICS):
-                self.first_used_message_time = self.first_used_message_time or message.publish_time
-                assert self.first_used_message_time is not None, "First used message, did not have a publish time"
-
-                relative_timestamp = self.calculate_relative_timestamp(message.publish_time)
+                first_used_msg_time = first_used_msg_time or message.publish_time
+                relative_timestamp = (message.publish_time - first_used_msg_time) / 1e9
 
                 match channel.topic:
                     case "/gamestate":
-                        recording.team_color = TeamColor.BLUE if ros_msg.team_color == 0 else TeamColor.RED
-                        self.models.get("game_states").append(
-                            self.create_gamestate(ros_msg, relative_timestamp, recording)
+                        model_data.recording.team_color = TeamColor.BLUE if ros_msg.team_color == 0 else TeamColor.RED
+                        model_data.game_states.append(
+                            self.create_gamestate(ros_msg, relative_timestamp, model_data.recording)
                         )
                     case "/joint_states":
-                        self.models.get("joint_states").append(
-                            self.create_joint_states(ros_msg, relative_timestamp, recording)
+                        model_data.joint_states.append(
+                            self.create_joint_states(ros_msg, relative_timestamp, model_data.recording)
                         )
                     case "/DynamixelController/command":
-                        self.models.get("joint_commands").append(
-                            self.create_joint_commands(ros_msg, relative_timestamp, recording)
+                        model_data.joint_commands.append(
+                            self.create_joint_commands(ros_msg, relative_timestamp, model_data.recording)
                         )
 
-        self.db.session.add_all(
-            self.models.get("game_states") + self.models.get("joint_states") + self.models.get("joint_commands")
-        )
-        self.db.session.commit()
+        return model_data
 
-    def create_recording(self, summary: Summary):
+    def create_recording(self, summary: Summary, mcap_file_path: Path) -> Recording:
         start_timestamp, end_timestamp = self.extract_timeframe(summary)
 
         return Recording(
-            allow_public=True,
-            original_file=self.bag_path.name,
-            team_name="Bit-Bots",
-            robot_type="Wolfgang-OP",
+            allow_public=self.metadata.allow_public,
+            original_file=mcap_file_path.name,
+            team_name=self.metadata.team_name,
+            robot_type=self.metadata.robot_type,
             start_time=datetime.fromtimestamp(start_timestamp / 1e9),
             end_time=datetime.fromtimestamp(end_timestamp / 1e9),
-            location="RoboCup 2024",
-            simulated=False,
+            location=self.metadata.location,
+            simulated=self.metadata.simulated,
             # needs to be overwritten when processing images
             img_width_scaling=0.0,
             img_height_scaling=0.0,
@@ -204,55 +192,27 @@ class RosBagToModelMapper:
 
     def create_joint_states(self, msg, relative_timestamp: float, recording: Recording) -> JointStates:
         joint_states_data = list(zip(msg.name, msg.position))
-        joint_states_dict = {
-            camelcase_to_snakecase(name): self.shift_radian_to_positive_range(position)
-            for name, position in joint_states_data
-        }
 
-        return JointStates(stamp=relative_timestamp, recording=recording, **joint_states_dict)
+        return JointStates(
+            stamp=relative_timestamp, recording=recording, **self._joints_dict_from_msg_data(joint_states_data)
+        )
 
     def create_joint_commands(self, msg, relative_timestamp: float, recording: Recording) -> JointStates:
         joint_commands_data = list(zip(msg.joint_names, msg.positions))
 
         return JointCommands(
-            stamp=relative_timestamp, recording=recording, **self.joint_commands_dict_from_msg_data(joint_commands_data)
+            stamp=relative_timestamp, recording=recording, **self._joints_dict_from_msg_data(joint_commands_data)
         )
 
-    def joint_commands_dict_from_msg_data(self, joint_commands_data: list[tuple[str, float]]) -> dict[str, float]:
-        joint_commands_dict = {}
+    def _joints_dict_from_msg_data(self, joints_data: list[tuple[str, float]]) -> dict[str, float]:
+        joints_dict = {}
 
-        for name, position in joint_commands_data:
+        for name, position in joints_data:
             key = camelcase_to_snakecase(name)
-            value = self.shift_radian_to_positive_range(position)
-            joint_commands_dict[key] = value
+            value = shift_radian_to_positive_range(position)
+            joints_dict[key] = value
 
-        return joint_commands_dict
-
-    def shift_radian_to_positive_range(self, principal_range_radian: float) -> float:
-        """
-        Shift the principal range radian [-pi, pi] to the positive principal range [0, 2pi].
-        """
-        return (principal_range_radian + 2 * np.pi) % (2 * np.pi)
-
-    def calculate_relative_timestamp(self, publish_time: int) -> float:
-        """
-        Calculate the relative timestamp offset in seconds (float) from the first used message publish time.
-        """
-        assert self.first_used_message_time is not None, "First used message, did not have a publish time"
-        return (publish_time - self.first_used_message_time) / 1e9
-
-    def _log_debug_info(self, summary: Summary, recording: Recording):
-        log_message = f"Processing rosbag: {recording.original_file} - {recording.team_name}"
-        if recording.location:
-            log_message += f" {recording.location}"
-        if recording.start_time:
-            log_message += f": {recording.start_time}"
-
-        available_topics = [channel.topic for channel in summary.channels.values()]
-        log_message += f"\nAvailable topics: {available_topics}"
-        log_message += f"\nUsed topics: {USED_TOPICS}"
-
-        logger.info(log_message)
+        return joints_dict
 
     def extract_timeframe(self, summary: Summary) -> tuple[int, int]:
         first_msg_start_time = None
@@ -268,3 +228,21 @@ class RosBagToModelMapper:
         assert last_msg_end_time is not None, "No end time found in the MCAP file"
 
         return first_msg_start_time, last_msg_end_time
+
+    @contextmanager
+    def _mcap_reader(self, mcap_file_path: Path):
+        with open(mcap_file_path, "rb") as f:
+            yield make_reader(f, decoder_factories=[DecoderFactory()])
+
+    def _log_debug_info(self, summary: Summary, recording: Recording):
+        log_message = f"Processing rosbag: {recording.original_file} - {recording.team_name}"
+        if recording.location:
+            log_message += f" {recording.location}"
+        if recording.start_time:
+            log_message += f": {recording.start_time}"
+
+        available_topics = [channel.topic for channel in summary.channels.values()]
+        log_message += f"\nAvailable topics: {available_topics}"
+        log_message += f"\nUsed topics: {USED_TOPICS}"
+
+        logger.info(log_message)

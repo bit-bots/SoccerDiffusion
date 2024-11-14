@@ -1,8 +1,8 @@
-env/
 logs/
 *.csv
 *.sqlite
 *.sqlite3
+*.sqlite3-journal
 *.mcap
 */metadata.yaml
 
@@ -209,6 +209,3 @@ ENV/
 
 # Torch models
 *.pth
-
-# rosbag/data input folder
-input/
