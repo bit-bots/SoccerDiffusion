@@ -10,7 +10,7 @@ import torch
 from profilehooks import profile
 from torch.utils.data import DataLoader, Dataset
 
-from ddlitlab2024.dataset.models import RobotState
+from ddlitlab2024.dataset.models import JointState, RobotState
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 from ddlitlab2024.utils.utils import quats_to_5d
 
@@ -100,8 +100,31 @@ class DDLITLab2024Dataset(Dataset):
             self.db_connection,
         )
 
-        # Convert to numpy array, keep only the joint angle columns (np.float32 type)
-        raw_joint_data = raw_joint_data.drop(columns=["_id", "stamp", "recording_id"]).to_numpy(dtype=np.float32)
+        # Convert to numpy array, keep only the joint angle columns in alphabetical order
+        raw_joint_data = raw_joint_data[
+            [
+                JointState.head_pan.name,
+                JointState.head_tilt.name,
+                JointState.l_ankle_pitch.name,
+                JointState.l_ankle_roll.name,
+                JointState.l_elbow.name,
+                JointState.l_hip_pitch.name,
+                JointState.l_hip_roll.name,
+                JointState.l_hip_yaw.name,
+                JointState.l_knee.name,
+                JointState.l_shoulder_pitch.name,
+                JointState.l_shoulder_roll.name,
+                JointState.r_ankle_pitch.name,
+                JointState.r_ankle_roll.name,
+                JointState.r_elbow.name,
+                JointState.r_hip_pitch.name,
+                JointState.r_hip_roll.name,
+                JointState.r_hip_yaw.name,
+                JointState.r_knee.name,
+                JointState.r_shoulder_pitch.name,
+                JointState.r_shoulder_roll.name,
+            ]
+        ].to_numpy(dtype=np.float32)
 
         # We don't need padding here, because we sample the data in the correct length for the targets
         return torch.from_numpy(raw_joint_data)
