@@ -387,17 +387,21 @@ if __name__ == "__main__":
 
             # Plot the joint command history
             plt.plot(
-                np.arange(-batch_0.joint_command_history.shape[1], 0),
+                np.arange(-batch_0.joint_command_history.shape[1], 0) / dataset.sampling_rate,
                 batch_0.joint_command_history[i, :, j].numpy(),
                 label="Command history",
             )
 
             # Draw the future joint commands
-            plt.plot(batch_0.joint_command[i, :, j].numpy(), label="Command future")
+            plt.plot(
+                np.arange(batch_0.joint_command.shape[1]) / dataset.sampling_rate,
+                batch_0.joint_command[i, :, j].numpy(),
+                label="Command future",
+            )
 
             # Draw the joint state history
             plt.plot(
-                np.arange(-batch_0.joint_state.shape[1], 0),
+                np.arange(-batch_0.joint_state.shape[1], 0) / dataset.sampling_rate,
                 batch_0.joint_state[i, :, j].numpy(),
                 label="Joint state",
             )
@@ -406,6 +410,6 @@ if __name__ == "__main__":
 
         # Plot the rotation data
         plt.title("Rotation")
-        plt.plot(batch_0.rotation[i].numpy())
+        plt.plot(np.arange(-batch_0.rotation.shape[1], 0) / dataset.sampling_rate, batch_0.rotation[i].numpy())
         plt.legend(["x", "y", "z", "w"])
         plt.show()
