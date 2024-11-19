@@ -18,7 +18,11 @@ class RobotState(str, Enum):
 
     @classmethod
     def values(cls):
-        return [e.value for e in cls]
+        return sorted([e.value for e in cls])
+
+    def __int__(self):
+        # Use index of sorted strings
+        return self.values().index(self.value)
 
 
 class TeamColor(str, Enum):
