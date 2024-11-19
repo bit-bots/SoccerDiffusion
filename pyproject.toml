@@ -48,4 +48,4 @@ line-length = 120
 select = ["F", "E", "B", "W", "I", "N", "UP"]
 
 [tool.poetry.scripts]
-cli = "ddlitlab2024.dataset.main:main"
+cli = "ddlitlab2024.dataset.cli:main"
