@@ -322,6 +322,22 @@ class DDLITLab2024Dataset(Dataset):
         )
 
 
+class Normalizer:
+    def __init__(self, mean: torch.Tensor, std: torch.Tensor):
+        self.mean = mean
+        self.std = std
+
+    @classmethod
+    def fit(cls, data: torch.Tensor):
+        return cls(data.mean(dim=0), data.std(dim=0))
+
+    def normalize(self, data: torch.Tensor):
+        return (data - self.mean) / self.std
+
+    def denormalize(self, data: torch.Tensor):
+        return data * self.std + self.mean
+
+
 # Some dummy code to test the dataset
 if __name__ == "__main__":
     dataset = DDLITLab2024Dataset(os.path.join(os.path.dirname(__file__), "db.sqlite3"))
