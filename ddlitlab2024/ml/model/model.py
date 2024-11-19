@@ -124,7 +124,7 @@ class End2EndDiffusionTransformer(nn.Module):
         if self.image_sequence_encoder is not None:
             context.append(self.image_sequence_encoder(input_data["image_data"]))
 
-        #TODO utilize gamestate and image time stamps
+        # TODO utilize gamestate and image time stamps
 
         return context
 
