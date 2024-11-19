@@ -39,7 +39,7 @@ class DDLITLab2024Dataset(Dataset):
         num_samples_joint_trajectory_future: int = 10,
         sampling_rate: int = 100,
         max_fps_video: int = 10,
-        num_frames_video: int = 50,
+        num_frames_video: int = 10,
         trajectory_stride: int = 10,
     ):
         # Store the parameters
@@ -55,7 +55,7 @@ class DDLITLab2024Dataset(Dataset):
 
         # The Data exists in a sqlite database
         assert data_base_path.endswith(".sqlite3"), "The database should be a sqlite file"
-        assert os.path.exists(data_base_path), "The database file does not exist"
+        assert os.path.exists(data_base_path), f"The database file '{data_base_path}' does not exist"
         self.data_base_path = data_base_path
 
         # Load the data from the database
@@ -177,18 +177,22 @@ class DDLITLab2024Dataset(Dataset):
         # Get the raw image data
         for stamp, data in cursor:
             # Deserialize the image data
-            image_data.append(np.frombuffer(data, dtype=np.uint8).reshape(480, 480, 3))
+            image = np.frombuffer(data, dtype=np.uint8).reshape(480, 480, 3)
+            # Make chw from hwc
+            image = np.moveaxis(image, -1, 0)
+            # Append to the list
+            image_data.append(image)
             stamps.append(stamp)
 
         # Apply zero padding if necessary
         if len(image_data) < num_samples:
             image_data = [
-                np.zeros((480, 480, 3), dtype=np.uint8) for _ in range(num_samples - len(image_data))
+                np.zeros((3, 480, 480), dtype=np.uint8) for _ in range(num_samples - len(image_data))
             ] + image_data
             stamps = [0.0 for _ in range(num_samples - len(stamps))] + stamps
 
         # Convert to tensor
-        image_data = torch.from_numpy(np.stack(image_data, axis=0))
+        image_data = torch.from_numpy(np.stack(image_data, axis=0)).float()
         stamps = torch.tensor(stamps)
 
         return stamps, image_data
