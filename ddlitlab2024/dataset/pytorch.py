@@ -12,9 +12,29 @@ from profilehooks import profile
 from torch.utils.data import DataLoader, Dataset
 
 from ddlitlab2024 import DB_PATH
+from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.models import JointStates, RobotState
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 from ddlitlab2024.utils.utils import quats_to_5d
+
+
+def connect_to_db(data_base_path: str | Path = DB_PATH, worker_id: int | None = None) -> sqlite3.Connection:
+    logger.info(f"Connecting to database at {data_base_path} in worker {worker_id}")
+    # The Data exists in a sqlite database
+    data_base_path = str(data_base_path)
+    assert data_base_path.endswith(".sqlite3"), "The database should be a sqlite file"
+    assert os.path.exists(data_base_path), f"The database file '{data_base_path}' does not exist"
+    data_base_path = data_base_path
+
+    db_connection = sqlite3.connect(data_base_path)
+    db_connection.execute("PRAGMA locking_mode = EXCLUSIVE")  # Lock the database to prevent writing
+    return db_connection
+
+
+def worker_init_fn(worker_id):
+    worker_info = torch.utils.data.get_worker_info()
+    dataset = worker_info.dataset  # The dataset copy in the worker process
+    dataset.db_connection = connect_to_db(worker_id=worker_id)
 
 
 class DDLITLab2024Dataset(Dataset):
@@ -33,7 +53,7 @@ class DDLITLab2024Dataset(Dataset):
 
     def __init__(
         self,
-        data_base_path: str | Path,
+        db_connection: sqlite3.Connection | None = None,
         num_samples_imu: int = 100,
         imu_representation: IMUEncoder.OrientationEmbeddingMethod = IMUEncoder.OrientationEmbeddingMethod.QUATERNION,
         num_samples_joint_states: int = 100,
@@ -44,6 +64,9 @@ class DDLITLab2024Dataset(Dataset):
         num_frames_video: int = 10,
         trajectory_stride: int = 10,
     ):
+        # Initialize the database connection
+        self.db_connection: sqlite3.Connection = db_connection if db_connection else connect_to_db()
+
         # Store the parameters
         self.num_samples_imu = num_samples_imu
         self.imu_representation = imu_representation
@@ -55,21 +78,8 @@ class DDLITLab2024Dataset(Dataset):
         self.num_frames_video = num_frames_video
         self.trajectory_stride = trajectory_stride
 
-        # The Data exists in a sqlite database
-        data_base_path = str(data_base_path)
-        assert data_base_path.endswith(".sqlite3"), "The database should be a sqlite file"
-        assert os.path.exists(data_base_path), f"The database file '{data_base_path}' does not exist"
-        self.data_base_path = data_base_path
-
-        # Load the data from the database
-        self.db_connection = sqlite3.connect(self.data_base_path)
-
-        # Lock the database to prevent writing
-        self.db_connection.execute("PRAGMA locking_mode = EXCLUSIVE")
-
-        cursor = self.db_connection.cursor()
-
         # SQL query that get the first and last timestamp of the joint command for each recording
+        cursor = self.db_connection.cursor()
         cursor.execute(
             "SELECT recording_id, COUNT(*) AS num_entries_in_recording FROM JointCommands GROUP BY recording_id"
         )
