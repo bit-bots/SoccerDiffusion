@@ -11,7 +11,12 @@ class Database:
     def __init__(self, db_path: Path):
         self.db_path = db_path
         self.engine: Engine = self._setup_sqlite()
-        self.session: Session | None = None
+        self.session: Session
+
+    def __del__(self):
+        self.close_session()
+        self.engine.dispose()
+        logger.info("Database connection closed")
 
     def _setup_sqlite(self) -> Engine:
         return create_engine(f"sqlite:///{self.db_path}")
@@ -21,15 +26,28 @@ class Database:
         Base.metadata.create_all(self.engine)
         logger.info("Database schema created")
 
-    def create_session(self, create_schema: bool = True) -> Session:
+    def create_session(self, create_schema: bool = True) -> "Database":
         logger.info("Setting up database session")
         if create_schema:
             self._create_schema()
-        return sessionmaker(bind=self.engine)()
 
-    def close_session(self) -> None:
+        self.session = sessionmaker(bind=self.engine)()
+        logger.info("Database session created")
+
+        return self
+
+    def close_session(self) -> "Database":
         if self.session:
-            self.session.close()
+            self.session.close_all()
             logger.info("Database session closed")
         else:
             logger.warning("No database session to close")
+
+        return self
+
+    def clear_database(self) -> "Database":
+        logger.info("Clearing database")
+        Base.metadata.drop_all(self.engine)
+        logger.info("Database cleared")
+
+        return self
