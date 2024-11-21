@@ -8,6 +8,7 @@ from ema_pytorch import EMA
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from ddlitlab2024 import DB_PATH
 from ddlitlab2024.dataset.pytorch import DDLITLab2024Dataset, Normalizer
 from ddlitlab2024.ml import logger
 from ddlitlab2024.ml.model import End2EndDiffusionTransformer
@@ -28,7 +29,7 @@ if __name__ == "__main__":
     num_heads = 4
     action_context_length = 100
     trajectory_prediction_length = 10
-    epochs = 400
+    epochs = 4
     batch_size = 16
     lr = 1e-4
     train_denoising_timesteps = 1000
@@ -36,7 +37,7 @@ if __name__ == "__main__":
 
     # Load the dataset
     logger.info("Create dataset objects")
-    dataset = DDLITLab2024Dataset("/home/florian/ddlitlab/ddlitlab_repo/ddlitlab2024/dataset/db.sqlite3")
+    dataset = DDLITLab2024Dataset(DB_PATH)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=DDLITLab2024Dataset.collate_fn)
 
     # Get some samples to estimate the mean and std

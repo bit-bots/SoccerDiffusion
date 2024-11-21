@@ -2,6 +2,7 @@
 import os
 import sqlite3
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Iterable, Literal
 
 import numpy as np
@@ -10,6 +11,7 @@ import torch
 from profilehooks import profile
 from torch.utils.data import DataLoader, Dataset
 
+from ddlitlab2024 import DB_PATH
 from ddlitlab2024.dataset.models import JointState, RobotState
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 from ddlitlab2024.utils.utils import quats_to_5d
@@ -31,7 +33,7 @@ class DDLITLab2024Dataset(Dataset):
 
     def __init__(
         self,
-        data_base_path: str,
+        data_base_path: str | Path,
         num_samples_imu: int = 100,
         imu_representation: IMUEncoder.OrientationEmbeddingMethod = IMUEncoder.OrientationEmbeddingMethod.QUATERNION,
         num_samples_joint_states: int = 100,
@@ -54,6 +56,7 @@ class DDLITLab2024Dataset(Dataset):
         self.trajectory_stride = trajectory_stride
 
         # The Data exists in a sqlite database
+        data_base_path = str(data_base_path)
         assert data_base_path.endswith(".sqlite3"), "The database should be a sqlite file"
         assert os.path.exists(data_base_path), f"The database file '{data_base_path}' does not exist"
         self.data_base_path = data_base_path
@@ -64,7 +67,6 @@ class DDLITLab2024Dataset(Dataset):
         # Lock the database to prevent writing
         self.db_connection.execute("PRAGMA locking_mode = EXCLUSIVE")
 
-        # Get the total length of the dataset in seconds
         cursor = self.db_connection.cursor()
 
         # SQL query that get the first and last timestamp of the joint command for each recording
@@ -344,7 +346,7 @@ class Normalizer:
 
 # Some dummy code to test the dataset
 if __name__ == "__main__":
-    dataset = DDLITLab2024Dataset(os.path.join(os.path.dirname(__file__), "db.sqlite3"))
+    dataset = DDLITLab2024Dataset(DB_PATH)
 
     dataloader = DataLoader(dataset, batch_size=64, shuffle=True, collate_fn=DDLITLab2024Dataset.collate_fn)
 
