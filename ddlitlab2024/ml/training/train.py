@@ -104,7 +104,7 @@ if __name__ == "__main__":
 
             # Sample a random timestep for each trajectory in the batch
             random_timesteps = (
-                torch.randint(0, scheduler.config["num_train_timesteps"], (batch_size,)).long().to(device)
+                torch.randint(0, scheduler.config["num_train_timesteps"], (joint_targets.size(0),)).long().to(device)
             )
 
             # Sample noise to add to the entire trajectory
