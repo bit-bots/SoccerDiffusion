@@ -29,7 +29,7 @@ if __name__ == "__main__":
     action_context_length = 100
     trajectory_prediction_length = 10
     epochs = 400
-    batch_size = 2
+    batch_size = 16
     lr = 1e-4
     train_denoising_timesteps = 1000
     num_joints = 20  # TODO get from dataset
