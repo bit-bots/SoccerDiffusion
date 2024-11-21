@@ -8,8 +8,7 @@ from ema_pytorch import EMA
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from ddlitlab2024 import DB_PATH
-from ddlitlab2024.dataset.pytorch import DDLITLab2024Dataset, Normalizer
+from ddlitlab2024.dataset.pytorch import DDLITLab2024Dataset, Normalizer, worker_init_fn
 from ddlitlab2024.ml import logger
 from ddlitlab2024.ml.model import End2EndDiffusionTransformer
 from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType
@@ -37,8 +36,18 @@ if __name__ == "__main__":
 
     # Load the dataset
     logger.info("Create dataset objects")
-    dataset = DDLITLab2024Dataset(DB_PATH)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=DDLITLab2024Dataset.collate_fn)
+    dataset = DDLITLab2024Dataset()
+    num_workers = 5
+    dataloader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=DDLITLab2024Dataset.collate_fn,
+        persistent_workers=num_workers > 1,
+        #prefetch_factor=10 * num_workers,
+        num_workers=num_workers,
+        worker_init_fn=worker_init_fn,
+    )
 
     # Get some samples to estimate the mean and std
     logger.info("Estimating normalization parameters")
