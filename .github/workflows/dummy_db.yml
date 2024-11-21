@@ -1,4 +1,4 @@
-name: Create DB with dummy data
+name: Create DB with example data
 
 on:
   push:
@@ -13,24 +13,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.12'
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.12"
 
-    - name: Install Poetry
-      run: |
-        curl -sSL https://install.python-poetry.org | python3 -
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Install Poetry
+        run: |
+          curl -fsSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-    - name: Install dependencies
-      run: poetry install
+      - name: Install dependencies
+        run: poetry install
 
-    - name: Create DB schema
-      run: poetry run cli db create-schema
+      - name: Create DB schema
+        run: poetry run cli db create-schema
 
-    - name: Populate DB with dummy data
-      run: poetry run cli db dummy-data -n 2 -s 100 -i 10
+      - name: Populate DB with dummy data
+        run: |
+          poetry run cli db create-schema
+          poetry run cli db dummy-data -n 2 -s 100 -i 10
+
+      - name: Test rosbag import from data.bit-bots.de
+        run: |
+          curl -fsSLO https://data.bit-bots.de/ROSbags/robocup_2024/ID_donna_2024-07-18T15%3A20%3A44/ID_donna_2024-07-18T15%3A20%3A44_0.mcap
+          poetry run cli db create-schema
+          poetry run cli import rosbag ID_donna_2024-07-18T15%3A20%3A44_0.mcap

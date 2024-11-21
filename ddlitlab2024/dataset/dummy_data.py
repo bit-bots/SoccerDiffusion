@@ -11,8 +11,8 @@ from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.models import (
     GameState,
     Image,
-    JointCommand,
-    JointState,
+    JointCommands,
+    JointStates,
     Recording,
     RobotState,
     Rotation,
@@ -20,10 +20,10 @@ from ddlitlab2024.dataset.models import (
 )
 
 
-def insert_recordings(db: Session, n) -> list[int]:
+def insert_recordings(db_session: Session, n) -> list[int]:
     logger.debug("Inserting recordings...")
     for i in range(n):
-        db.add(
+        db_session.add(
             Recording(
                 allow_public=True,
                 original_file=f"dummy_original_file{i}",
@@ -37,14 +37,13 @@ def insert_recordings(db: Session, n) -> list[int]:
                 img_height_scaling=1.0,
             ),
         )
-    db.flush()  # Ensure the recording is written to the database and the ID is generated
-    recording = db.query(Recording).order_by(Recording._id.desc()).limit(n).all()
+    recording = db_session.query(Recording).order_by(Recording._id.desc()).limit(n).all()
     if recording is None:
         raise ValueError("Failed to insert recordings")
     return [r._id for r in reversed(recording)]
 
 
-def insert_images(db: Session, recording_ids: list[int], n: int, step: int) -> None:
+def insert_images(db_session: Session, recording_ids: list[int], n: int, step: int) -> None:
     logger.info("Generating images...")
 
     def generate_test_image(width: int, height: int, timestamp: float) -> np.ndarray:
@@ -71,11 +70,11 @@ def insert_images(db: Session, recording_ids: list[int], n: int, step: int) -> N
 
     for recording_id in tqdm(recording_ids):
         # Get width and height from the recording
-        recording = db.query(Recording).get(recording_id)
+        recording = db_session.query(Recording).get(recording_id)
         if recording is None:
             raise ValueError(f"Recording '{recording_id}' not found")
         for i in range(0, n, step):
-            db.add(
+            db_session.add(
                 Image(
                     stamp=i / 100,
                     recording_id=recording_id,
@@ -84,7 +83,7 @@ def insert_images(db: Session, recording_ids: list[int], n: int, step: int) -> N
             )
 
 
-def insert_rotations(db: Session, recording_ids: list[int], n: int, speed=0.1) -> None:
+def insert_rotations(db_session: Session, recording_ids: list[int], n: int, speed=0.1) -> None:
     logger.info("Generating rotations...")
     for recording_id in tqdm(recording_ids):
         x_shift = random.random()
@@ -93,7 +92,7 @@ def insert_rotations(db: Session, recording_ids: list[int], n: int, speed=0.1) -
         w_shift = random.random()
 
         for i in range(n):
-            db.add(
+            db_session.add(
                 Rotation(
                     stamp=i / 100,
                     recording_id=recording_id,
@@ -105,13 +104,13 @@ def insert_rotations(db: Session, recording_ids: list[int], n: int, speed=0.1) -
             )
 
 
-def insert_joint_states(db: Session, recording_ids: list[int], n: int, speed: float = 0.2) -> None:
+def insert_joint_states(db_session: Session, recording_ids: list[int], n: int, speed: float = 0.2) -> None:
     logger.info("Generating joint states...")
     for recording_id in tqdm(recording_ids):
         offsets = [random.random() for _ in range(20)]
         for i in range(n):
-            db.add(
-                JointState(
+            db_session.add(
+                JointStates(
                     stamp=i / 100,
                     recording_id=recording_id,
                     r_shoulder_pitch=math.sin(speed * i + offsets[0]) + math.pi,
@@ -138,13 +137,13 @@ def insert_joint_states(db: Session, recording_ids: list[int], n: int, speed: fl
             )
 
 
-def insert_joint_commands(db: Session, recording_ids: list[int], n: int, speed: float = 0.2) -> None:
+def insert_joint_commands(db_session: Session, recording_ids: list[int], n: int, speed: float = 0.2) -> None:
     logger.info("Generating joint commands...")
     for recording_id in tqdm(recording_ids):
         offsets = [random.random() for _ in range(20)]
         for i in range(n):
-            db.add(
-                JointCommand(
+            db_session.add(
+                JointCommands(
                     stamp=i / 100,
                     recording_id=recording_id,
                     r_shoulder_pitch=math.sin(speed * i + offsets[0]) + math.pi,
@@ -171,11 +170,11 @@ def insert_joint_commands(db: Session, recording_ids: list[int], n: int, speed: 
             )
 
 
-def insert_game_states(db: Session, recording_ids: list[int], n: int) -> None:
+def insert_game_states(db_session: Session, recording_ids: list[int], n: int) -> None:
     logger.info("Generating game states...")
     for recording_id in tqdm(recording_ids):
         for i in range(n):
-            db.add(
+            db_session.add(
                 GameState(
                     stamp=i / 100,
                     recording_id=recording_id,
@@ -184,14 +183,14 @@ def insert_game_states(db: Session, recording_ids: list[int], n: int) -> None:
             )
 
 
-def insert_dummy_data(db: Session, num_recordings: int, num_samples_per_rec: int, image_step: int) -> None:
+def insert_dummy_data(db_session: Session, num_recordings: int, num_samples_per_rec: int, image_step: int) -> None:
     logger.info("Inserting dummy data...")
-    recording_ids: list[int] = insert_recordings(db, num_recordings)
-    insert_images(db, recording_ids, num_samples_per_rec, image_step)
-    insert_rotations(db, recording_ids, num_samples_per_rec)
-    insert_joint_states(db, recording_ids, num_samples_per_rec)
-    insert_joint_commands(db, recording_ids, num_samples_per_rec)
-    insert_game_states(db, recording_ids, num_samples_per_rec)
+    recording_ids: list[int] = insert_recordings(db_session, num_recordings)
+    insert_images(db_session, recording_ids, num_samples_per_rec, image_step)
+    insert_rotations(db_session, recording_ids, num_samples_per_rec)
+    insert_joint_states(db_session, recording_ids, num_samples_per_rec)
+    insert_joint_commands(db_session, recording_ids, num_samples_per_rec)
+    insert_game_states(db_session, recording_ids, num_samples_per_rec)
     logger.info("Committing dummy data to database...")
-    db.commit()
+    db_session.commit()
     logger.info(f"Dummy data inserted. Recording IDs: {recording_ids}")
