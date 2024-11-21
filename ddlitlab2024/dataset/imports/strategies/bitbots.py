@@ -34,85 +34,6 @@ class GameStateMessage(Enum):
     FINISHED = 4
 
 
-TOPIC_LIST_GO = [
-    "/DynamixelController/command",
-    "/animation",
-    "/audio/audio",
-    "/ball_obstacle_active",
-    "/ball_position_relative_filtered",
-    "/ball_relative_filtered",
-    "/ball_relative_movement",
-    "/balls_relative",
-    "/camera/camera_info",
-    "/camera/image_to_record",
-    "/cmd_vel",
-    "/debug/approach_point",
-    "/debug/ball_twist",
-    "/debug/dsd/body_behavior/dsd_current_action",
-    "/debug/dsd/body_behavior/dsd_stack",
-    "/debug/dsd/body_behavior/dsd_tree",
-    "/debug/dsd/hcm/dsd_current_action",
-    "/debug/dsd/hcm/dsd_stack",
-    "/debug/dsd/hcm/dsd_tree",
-    "/debug/dsd/localization/dsd_current_action",
-    "/debug/dsd/localization/dsd_stack",
-    "/debug/dsd/localization/dsd_tree",
-    "/debug/used_ball",
-    "/debug/which_ball_is_used",
-    "/diagnostics",
-    "/diagnostics_agg",
-    "/field/map",
-    "/gamestate",
-    "/goal_pose",
-    "/head_mode",
-    "/motion_odometry",
-    "/pose_with_covariance",
-    "/robot_state",
-    "/robots_relative",
-    "/robots_relative_filtered",
-    "/rosout",
-    "/strategy",
-    "/system_workload",
-    "/team_data",
-    "/tf",
-    "/tf_static",
-    "/time_to_ball",
-]
-
-TOPIC_LIST_RBC24 = [
-    "/DynamixelController/command",
-    "/audio/audio",
-    "/ball_position_relative_filtered",
-    "/balls_relative",
-    "/camera/camera_info",
-    "/camera/image_proc",
-    "/cmd_vel",
-    "/core/power_switch_status",
-    "/debug/dsd/body_behavior/dsd_stack",
-    "/debug/dsd/body_behavior/dsd_tree",
-    "/debug/dsd/hcm/dsd_current_action",
-    "/debug/dsd/hcm/dsd_stack",
-    "/debug/dsd/hcm/dsd_tree",
-    "/debug/dsd/localization/dsd_stack",
-    "/debug/dsd/localization/dsd_tree",
-    "/diagnostics",
-    "/diagnostics_agg",
-    "/field/map",
-    "/joint_states",
-    "/motion_odometry",
-    "/pose_with_covariance",
-    "/robot_state",
-    "/robots_relative",
-    "/robots_relative_filtered",
-    "/rosout",
-    "/strategy",
-    "/system_workload",
-    "/tf",
-    "/tf_static",
-    "/time_to_ball",
-    "/workspace_status",
-]
-
 USED_TOPICS = [
     "/DynamixelController/command",
     "/camera/camera_info",
@@ -148,7 +69,15 @@ class BitBotsImportStrategy(ImportStrategy):
 
                 match channel.topic:
                     case "/gamestate":
-                        model_data.recording.team_color = TeamColor.BLUE if ros_msg.team_color == 0 else TeamColor.RED
+                        team_color = TeamColor.BLUE if ros_msg.team_color == 0 else TeamColor.RED
+                        if model_data.recording.team_color is None:
+                            model_data.recording.team_color = team_color
+
+                        team_color_changed = model_data.recording.team_color != team_color
+
+                        if team_color_changed:
+                            logger.warning("The team color changed, during one recording! This will be ignored.")
+
                         model_data.game_states.append(
                             self.create_gamestate(ros_msg, relative_timestamp, model_data.recording)
                         )
@@ -161,8 +90,23 @@ class BitBotsImportStrategy(ImportStrategy):
                             self.create_joint_commands(ros_msg, relative_timestamp, model_data.recording)
                         )
                     case "/camera/image_proc" | "/camera/image_raw":
-                        model_data.recording.img_width_scaling = DEFAULT_IMG_SIZE[0] / ros_msg.width
-                        model_data.recording.img_height_scaling = DEFAULT_IMG_SIZE[1] / ros_msg.height
+                        img_scaling = (DEFAULT_IMG_SIZE[0] / ros_msg.width, DEFAULT_IMG_SIZE[1] / ros_msg.height)
+                        if model_data.recording.img_width_scaling == 0.0:
+                            model_data.recording.img_width_scaling = img_scaling[0]
+                        if model_data.recording.img_height_scaling == 0.0:
+                            model_data.recording.img_height_scaling = img_scaling[1]
+
+                        img_scaling_changed = (
+                            model_data.recording.img_width_scaling != img_scaling[0]
+                            or model_data.recording.img_height_scaling != img_scaling[1]
+                        )
+
+                        if img_scaling_changed:
+                            logger.error(
+                                "The image sizes changed, during one recording! "
+                                + "All images of a recording must have the same size."
+                            )
+
                         model_data.images.append(self.create_image(ros_msg, relative_timestamp, model_data.recording))
 
         return model_data

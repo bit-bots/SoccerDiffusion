@@ -101,7 +101,7 @@ class Image(Base):
         assert image.dtype == np.uint8, "Image must be of type np.uint8"
         assert image.ndim == 3, "Image must have 3 dimensions"
         assert image.shape[2] == 3, "Image must have 3 channels"
-        assert recording_id is not None or recording is not None, "Either id of recording or recording must be provided"
+        assert recording_id is not None or recording is not None, "Either recording_id or recording must be provided"
 
         if recording is None:
             super().__init__(stamp=stamp, recording_id=recording_id, data=image.tobytes())
