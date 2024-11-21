@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from ddlitlab2024.dataset import logger
-from ddlitlab2024.dataset.models import Recording, stamp_to_nanoseconds, stamp_to_seconds_nanoseconds
+from ddlitlab2024.dataset.models import JointStates, Recording, stamp_to_nanoseconds, stamp_to_seconds_nanoseconds
 
 try:
     import rosbag2_py
@@ -23,7 +23,7 @@ except ImportError:
     sys.exit(1)
 
 
-def get_recording(db: Session, recording_id_or_filename: str | int) -> Recording:
+def get_recording(db_session: Session, recording_id_or_filename: str | int) -> Recording:
     """Get the recording from the input string or integer
 
     param db: The database
@@ -34,12 +34,12 @@ def get_recording(db: Session, recording_id_or_filename: str | int) -> Recording
     if isinstance(recording_id_or_filename, int) or recording_id_or_filename.isdigit():
         # Verify that the recording exists
         recording_id = int(recording_id_or_filename)
-        recording = db.query(Recording).get(recording_id)
+        recording = db_session.query(Recording).get(recording_id)
         if recording is None:
             raise ValueError(f"Recording '{recording_id}' not found")
         return recording
     elif isinstance(recording_id_or_filename, str):
-        recording = db.query(Recording).filter(Recording.original_file == recording_id_or_filename).first()
+        recording = db_session.query(Recording).filter(Recording.original_file == recording_id_or_filename).first()
         if recording is None:
             raise ValueError(f"Recording with original filename '{recording_id_or_filename}' not found")
         return recording
@@ -233,7 +233,7 @@ def write_joint_commands(
     logger.info("Writing joint commands")
     for joint_command in recording.joint_commands:
         seconds, nanoseconds = stamp_to_seconds_nanoseconds(joint_command.stamp)
-        joints: list[tuple[str, float]] = [
+        joints: list[tuple[str, float | None]] = [
             ("r_shoulder_pitch", joint_command.r_shoulder_pitch),
             ("l_shoulder_pitch", joint_command.l_shoulder_pitch),
             ("r_shoulder_roll", joint_command.r_shoulder_roll),
@@ -255,7 +255,7 @@ def write_joint_commands(
             ("head_pan", joint_command.head_pan),
             ("head_tilt", joint_command.head_tilt),
         ]
-        joint_command_msg = JointState(
+        joint_command_msg = JointStates(
             header=Header(stamp=Time(sec=seconds, nanosec=nanoseconds), frame_id="base_link"),
             name=[name for name, _ in joints],
             position=[position for _, position in joints],
@@ -286,14 +286,14 @@ def write_game_states(
         writer.write("/game_state", serialize_message(game_state_msg), stamp_to_nanoseconds(game_state.stamp))
 
 
-def recording2mcap(db: Session, recording_id_or_filename: str | int, output: Path) -> None:
+def recording2mcap(db_session: Session, recording_id_or_filename: str | int, output: Path) -> None:
     """Convert a recording to an mcap file
 
     param db: The database
     param recording_id_or_filename: The recording ID or original filename
     param output: The output mcap file
     """
-    recording = get_recording(db, recording_id_or_filename)
+    recording = get_recording(db_session, recording_id_or_filename)
     logger.info(f"Converting recording '{recording._id}' to mcap file '{output}'")
 
     writer = get_writer(output)
