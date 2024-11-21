@@ -12,7 +12,7 @@ from profilehooks import profile
 from torch.utils.data import DataLoader, Dataset
 
 from ddlitlab2024 import DB_PATH
-from ddlitlab2024.dataset.models import JointState, RobotState
+from ddlitlab2024.dataset.models import JointStates, RobotState
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 from ddlitlab2024.utils.utils import quats_to_5d
 
@@ -71,7 +71,7 @@ class DDLITLab2024Dataset(Dataset):
 
         # SQL query that get the first and last timestamp of the joint command for each recording
         cursor.execute(
-            "SELECT recording_id, COUNT(*) AS num_entries_in_recording FROM JointCommand GROUP BY recording_id"
+            "SELECT recording_id, COUNT(*) AS num_entries_in_recording FROM JointCommands GROUP BY recording_id"
         )
         recording_timestamps = cursor.fetchall()
 
@@ -92,7 +92,7 @@ class DDLITLab2024Dataset(Dataset):
         return self.num_samples
 
     def query_joint_data(
-        self, recording_id: int, start_sample: int, num_samples: int, table: Literal["JointCommand", "JointState"]
+        self, recording_id: int, start_sample: int, num_samples: int, table: Literal["JointCommands", "JointStates"]
     ) -> torch.Tensor:
         # Get the joint state
         raw_joint_data = pd.read_sql_query(
@@ -105,26 +105,26 @@ class DDLITLab2024Dataset(Dataset):
         # Convert to numpy array, keep only the joint angle columns in alphabetical order
         raw_joint_data = raw_joint_data[
             [
-                JointState.head_pan.name,
-                JointState.head_tilt.name,
-                JointState.l_ankle_pitch.name,
-                JointState.l_ankle_roll.name,
-                JointState.l_elbow.name,
-                JointState.l_hip_pitch.name,
-                JointState.l_hip_roll.name,
-                JointState.l_hip_yaw.name,
-                JointState.l_knee.name,
-                JointState.l_shoulder_pitch.name,
-                JointState.l_shoulder_roll.name,
-                JointState.r_ankle_pitch.name,
-                JointState.r_ankle_roll.name,
-                JointState.r_elbow.name,
-                JointState.r_hip_pitch.name,
-                JointState.r_hip_roll.name,
-                JointState.r_hip_yaw.name,
-                JointState.r_knee.name,
-                JointState.r_shoulder_pitch.name,
-                JointState.r_shoulder_roll.name,
+                JointStates.head_pan.name,
+                JointStates.head_tilt.name,
+                JointStates.l_ankle_pitch.name,
+                JointStates.l_ankle_roll.name,
+                JointStates.l_elbow.name,
+                JointStates.l_hip_pitch.name,
+                JointStates.l_hip_roll.name,
+                JointStates.l_hip_yaw.name,
+                JointStates.l_knee.name,
+                JointStates.l_shoulder_pitch.name,
+                JointStates.l_shoulder_roll.name,
+                JointStates.r_ankle_pitch.name,
+                JointStates.r_ankle_roll.name,
+                JointStates.r_elbow.name,
+                JointStates.r_hip_pitch.name,
+                JointStates.r_hip_roll.name,
+                JointStates.r_hip_yaw.name,
+                JointStates.r_knee.name,
+                JointStates.r_shoulder_pitch.name,
+                JointStates.r_shoulder_roll.name,
             ]
         ].to_numpy(dtype=np.float32)
 
@@ -132,7 +132,7 @@ class DDLITLab2024Dataset(Dataset):
         return torch.from_numpy(raw_joint_data)
 
     def query_joint_data_history(
-        self, recording_id: int, end_sample: int, num_samples: int, table: Literal["JointCommand", "JointState"]
+        self, recording_id: int, end_sample: int, num_samples: int, table: Literal["JointCommands", "JointStates"]
     ) -> torch.Tensor:
         # Handle lower bound
         start_sample = max(0, end_sample - num_samples)
@@ -286,17 +286,17 @@ class DDLITLab2024Dataset(Dataset):
 
         # Get the joint command target (future)
         joint_command = self.query_joint_data(
-            recording_id, sample_index, self.num_samples_joint_trajectory_future, "JointCommand"
+            recording_id, sample_index, self.num_samples_joint_trajectory_future, "JointCommands"
         )
 
         # Get the joint command history
         joint_command_history = self.query_joint_data_history(
-            recording_id, sample_index, self.num_samples_joint_trajectory, "JointCommand"
+            recording_id, sample_index, self.num_samples_joint_trajectory, "JointCommands"
         )
 
         # Get the joint state
         joint_state = self.query_joint_data_history(
-            recording_id, sample_index, self.num_samples_joint_states, "JointState"
+            recording_id, sample_index, self.num_samples_joint_states, "JointStates"
         )
 
         # Get the robot rotation (IMU data)
