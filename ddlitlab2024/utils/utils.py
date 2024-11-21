@@ -1,5 +1,9 @@
+import re
+
 import numpy as np
 from transforms3d.quaternions import quat2axangle
+
+CAMELCASE_TO_SNAKECASE_REGEX = re.compile(r"(?<!^)(?=[A-Z])")
 
 
 def quats_to_5d(quats: np.ndarray) -> np.ndarray:
@@ -38,3 +42,34 @@ def wxyz2xyzw(quat: np.ndarray) -> np.ndarray:
     :return: The (xyzw) representation.
     """
     return np.roll(quat, -1, axis=-1)
+
+
+def shift_radian_to_positive_range(radian: float) -> float:
+    """
+    Shift a principal range radian [-pi, pi] to the positive principal range [0, 2pi].
+
+    :param radian: The pricipal range radian radian [-pi, pi].
+    :return: The positive principal range radian [0, 2pi].
+    """
+    return (radian + 2 * np.pi) % (2 * np.pi)
+
+
+def timestamp_in_ns(seconds: int, nanoseconds: int) -> int:
+    """
+    Convert a combined unix timestamp from seconds and nanoseconds to timestamp in nanoseconds.
+    """
+    return int(seconds * 1e9) + nanoseconds
+
+
+def timestamp_in_s(seconds: int, nanoseconds: int) -> float:
+    """
+    Convert a timestamp in nanoseconds to a combined unix timestamp in seconds as float.
+    """
+    return seconds + nanoseconds / 1e9
+
+
+def camelcase_to_snakecase(name: str) -> str:
+    """
+    Convert a camelCase string to snake_case.
+    """
+    return CAMELCASE_TO_SNAKECASE_REGEX.sub("_", name).lower()

@@ -1,0 +1,15 @@
+{
+  "configurations": [
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Launch DDLitLab2024 import",
+      "program": "${workspaceFolder}/ddlitlab2024/dataset/main.py",
+      "args": [
+        "import",
+        "rosbag",
+        "${workspaceFolder}/input/ID_donna_2024-07-18T12_40_29_0.mcap"
+      ]
+    }
+  ]
+}
