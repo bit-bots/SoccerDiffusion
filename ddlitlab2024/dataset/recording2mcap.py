@@ -13,7 +13,7 @@ try:
     from builtin_interfaces.msg import Time
     from geometry_msgs.msg import Quaternion
     from rclpy.serialization import serialize_message
-    from sensor_msgs.msg import Image, JointState
+    from sensor_msgs.msg import Image
     from std_msgs.msg import Header, String
 except ImportError:
     logger.error(
