@@ -32,7 +32,6 @@ if __name__ == "__main__":
     batch_size = 16
     lr = 1e-4
     train_denoising_timesteps = 1000
-    num_joints = 20  # TODO get from dataset
 
     # Load the dataset
     logger.info("Create dataset objects")
@@ -58,7 +57,7 @@ if __name__ == "__main__":
 
     # Initialize the Transformer model and optimizer, and move model to device
     model = End2EndDiffusionTransformer(  # TODO enforce all params to be consistent with the dataset
-        num_joints=num_joints,
+        num_joints=dataset.num_joints,
         hidden_dim=hidden_dim,
         use_action_history=True,
         num_action_history_encoder_layers=2,

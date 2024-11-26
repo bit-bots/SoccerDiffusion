@@ -63,6 +63,7 @@ class DDLITLab2024Dataset(Dataset):
         max_fps_video: int = 10,
         num_frames_video: int = 50,
         trajectory_stride: int = 10,
+        num_joints: int = 20,
     ):
         # Initialize the database connection
         self.db_connection: sqlite3.Connection = db_connection if db_connection else connect_to_db()
@@ -77,6 +78,7 @@ class DDLITLab2024Dataset(Dataset):
         self.max_fps_video = max_fps_video
         self.num_frames_video = num_frames_video
         self.trajectory_stride = trajectory_stride
+        self.num_joints = num_joints
 
         # SQL query that get the first and last timestamp of the joint command for each recording
         cursor = self.db_connection.cursor()
@@ -137,6 +139,8 @@ class DDLITLab2024Dataset(Dataset):
                 JointStates.r_shoulder_roll.name,
             ]
         ].to_numpy(dtype=np.float32)
+
+        assert raw_joint_data.shape[1] == self.num_joints, "The number of joints is not correct"
 
         # We don't need padding here, because we sample the data in the correct length for the targets
         return torch.from_numpy(raw_joint_data)
@@ -308,7 +312,9 @@ class DDLITLab2024Dataset(Dataset):
         assert all([stamp >= image_stamp for image_stamp in image_stamps]), "The image data is not synchronized"
         assert len(image_stamps) == self.num_frames_video, "The image data is not the correct length"
         assert image_data.shape == (self.num_frames_video, 3, 480, 480), "The image data has the wrong shape"
-        assert image_stamps[0] >= stamp - (self.num_frames_video + 1) / self.max_fps_video, "The image data is not synchronized"
+        assert (
+            image_stamps[0] >= stamp - (self.num_frames_video + 1) / self.max_fps_video
+        ), "The image data is not synchronized"
 
         # Get the joint command target (future)
         joint_command = self.query_joint_data(
