@@ -61,7 +61,7 @@ class DDLITLab2024Dataset(Dataset):
         num_samples_joint_trajectory_future: int = 10,
         sampling_rate: int = 100,
         max_fps_video: int = 10,
-        num_frames_video: int = 10,
+        num_frames_video: int = 50,
         trajectory_stride: int = 10,
     ):
         # Initialize the database connection
@@ -170,24 +170,29 @@ class DDLITLab2024Dataset(Dataset):
         return raw_joint_data
 
     def query_image_data(
-        self, recording_id: int, end_sample: int, num_samples: int
+        self, recording_id: int, end_time_stamp: float, context_len: float, num_frames: int
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        # Handle lower bound
-        start_sample = max(0, end_sample - num_samples)
-        num_samples_to_query = end_sample - start_sample
-
         # Get the image data
         cursor = self.db_connection.cursor()
         cursor.execute(
-            "SELECT stamp, data FROM Image WHERE recording_id = $1 ORDER BY stamp ASC LIMIT $2 OFFSET $3",
-            (recording_id, num_samples_to_query, start_sample),
+            # Select the last num_samples images before the current time stamp and order them by time stamp in ascending order
+            "SELECT stamp, data FROM Image WHERE recording_id = $1 AND stamp BETWEEN $2 - $3 AND $2 ORDER BY stamp ASC;",
+            (recording_id, end_time_stamp, context_len),
         )
 
+        # Get the image data
+        response = cursor.fetchall()
+
+        # Drop the first frames if there are more than num_frames
+        if len(response) > num_frames:
+            response = response[-num_frames:]
+
+        # Get the image data
         stamps = []
         image_data = []
 
         # Get the raw image data
-        for stamp, data in cursor:
+        for stamp, data in response:
             # Deserialize the image data
             image = np.frombuffer(data, dtype=np.uint8).reshape(480, 480, 3)
             # Make chw from hwc
@@ -197,11 +202,11 @@ class DDLITLab2024Dataset(Dataset):
             stamps.append(stamp)
 
         # Apply zero padding if necessary
-        if len(image_data) < num_samples:
+        if len(image_data) < num_frames:
             image_data = [
-                np.zeros((3, 480, 480), dtype=np.uint8) for _ in range(num_samples - len(image_data))
+                np.zeros((3, 480, 480), dtype=np.uint8) for _ in range(num_frames - len(image_data))
             ] + image_data
-            stamps = [0.0 for _ in range(num_samples - len(stamps))] + stamps
+            stamps = [0.0 for _ in range(num_frames - len(stamps))] + stamps
 
         # Convert to tensor
         image_data = torch.from_numpy(np.stack(image_data, axis=0)).float()
@@ -292,7 +297,18 @@ class DDLITLab2024Dataset(Dataset):
         stamp = sample_index / self.sampling_rate
 
         # Get the image data
-        image_stamps, image_data = self.query_image_data(recording_id, sample_index, self.num_frames_video)
+        image_stamps, image_data = self.query_image_data(
+            recording_id,
+            stamp,
+            (self.num_frames_video + 1)
+            / self.max_fps_video,  # The duration is used to narrow down the query for a faster retrieval, so we consider it as an upper bound
+            self.num_frames_video,
+        )
+        # Some sanity checks
+        assert all([stamp >= image_stamp for image_stamp in image_stamps]), "The image data is not synchronized"
+        assert len(image_stamps) == self.num_frames_video, "The image data is not the correct length"
+        assert image_data.shape == (self.num_frames_video, 3, 480, 480), "The image data has the wrong shape"
+        assert image_stamps[0] >= stamp - (self.num_frames_video + 1) / self.max_fps_video, "The image data is not synchronized"
 
         # Get the joint command target (future)
         joint_command = self.query_joint_data(
@@ -356,9 +372,11 @@ class Normalizer:
 
 # Some dummy code to test the dataset
 if __name__ == "__main__":
-    dataset = DDLITLab2024Dataset(DB_PATH)
+    dataset = DDLITLab2024Dataset()
 
-    dataloader = DataLoader(dataset, batch_size=64, shuffle=True, collate_fn=DDLITLab2024Dataset.collate_fn)
+    dataloader = DataLoader(
+        dataset, batch_size=64, shuffle=True, collate_fn=DDLITLab2024Dataset.collate_fn, worker_init_fn=worker_init_fn
+    )
 
     # Plot the first sample
     import time
@@ -391,7 +409,7 @@ if __name__ == "__main__":
             axes_pad=0.1,  # pad between Axes in inch.
         )
         for ax, im in zip(grid, batch_0.image_data[i]):
-            ax.imshow(im.numpy())
+            ax.imshow(im.permute(1, 2, 0).numpy())
         plt.show()
 
         # Plot the joint command history and future (a subplot for each joint)
