@@ -41,3 +41,6 @@ LOGGING_PATH: str = _logging_path
 SESSION_ID: UUID = uuid4()
 
 DB_PATH: Path = Path.joinpath(Path(__file__).parent, "dataset", "db.sqlite3")
+
+DEFAULT_RESAMPLE_RATE_HZ = 50
+IMAGE_MAX_RESAMPLE_RATE_HZ = 10

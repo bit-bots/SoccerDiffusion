@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from ddlitlab2024.dataset.db import Database
 from ddlitlab2024.dataset.models import GameState, Image, JointCommands, JointStates, Recording
@@ -16,6 +17,21 @@ class ImportMetadata:
 
 
 @dataclass
+class Sample[T]:
+    data: T
+    timestamp: float
+    was_sampled_already: bool = False
+
+
+@dataclass
+class InputData:
+    image: Any = None
+    game_state: Any = None
+    joint_state: Any = None
+    joint_command: Any = None
+
+
+@dataclass
 class ModelData:
     recording: Recording | None = None
     game_states: list[GameState] = field(default_factory=list)
@@ -24,7 +40,14 @@ class ModelData:
     images: list[Image] = field(default_factory=list)
 
     def model_instances(self):
-        return [self.recording] + self.game_states + self.joint_states + self.joint_commands
+        return [self.recording] + self.game_states + self.joint_states + self.joint_commands + self.images
+
+    def merge(self, other: "ModelData") -> "ModelData":
+        self.game_states.extend(other.game_states)
+        self.joint_states.extend(other.joint_states)
+        self.joint_commands.extend(other.joint_commands)
+        self.images.extend(other.images)
+        return self
 
 
 class ImportStrategy(ABC):
