@@ -2,7 +2,7 @@ from enum import Enum
 
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.converters.converter import Converter
-from ddlitlab2024.dataset.imports.model_importer import InputData, ModelData
+from ddlitlab2024.dataset.imports.data import InputData, ModelData
 from ddlitlab2024.dataset.models import GameState, Recording, RobotState, TeamColor
 from ddlitlab2024.dataset.resampling.original_rate_resampler import OriginalRateResampler
 
@@ -33,8 +33,7 @@ class GameStateConverter(Converter):
         models = ModelData()
 
         for sample in self.resampler.resample(data, relative_timestamp):
-            if not sample.was_sampled_already:
-                models.game_states.append(self._create_game_state(sample.data.game_state, sample.timestamp, recording))
+            models.game_states.append(self._create_game_state(sample.data.game_state, sample.timestamp, recording))
 
         return models
 

@@ -6,20 +6,17 @@ from mcap.reader import make_reader
 from mcap.summary import Summary
 from mcap_ros2.decoder import DecoderFactory
 
-from ddlitlab2024 import DEFAULT_RESAMPLE_RATE_HZ, IMAGE_MAX_RESAMPLE_RATE_HZ
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.converters.converter import Converter
 from ddlitlab2024.dataset.converters.game_state_converter import GameStateConverter
 from ddlitlab2024.dataset.converters.image_converter import ImageConverter
 from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConverter
-from ddlitlab2024.dataset.imports.model_importer import ImportMetadata, ImportStrategy, InputData, ModelData
+from ddlitlab2024.dataset.imports.data import InputData, ModelData
+from ddlitlab2024.dataset.imports.model_importer import ImportMetadata, ImportStrategy
 from ddlitlab2024.dataset.models import (
     DEFAULT_IMG_SIZE,
     Recording,
 )
-from ddlitlab2024.dataset.resampling.max_rate_resampler import MaxRateResampler
-from ddlitlab2024.dataset.resampling.original_rate_resampler import OriginalRateResampler
-from ddlitlab2024.dataset.resampling.previous_interpolation_resampler import PreviousInterpolationResampler
 
 USED_TOPICS = [
     "/DynamixelController/command",
@@ -33,12 +30,18 @@ USED_TOPICS = [
 
 
 class BitBotsImportStrategy(ImportStrategy):
-    def __init__(self, metadata: ImportMetadata):
+    def __init__(
+        self,
+        metadata: ImportMetadata,
+        image_converter: ImageConverter,
+        game_state_converter: GameStateConverter,
+        synced_data_converter: SyncedDataConverter,
+    ):
         self.metadata = metadata
 
-        self.image_converter = ImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
-        self.game_state_converter = GameStateConverter(OriginalRateResampler())
-        self.synced_data_converter = SyncedDataConverter(PreviousInterpolationResampler(DEFAULT_RESAMPLE_RATE_HZ))
+        self.image_converter = image_converter
+        self.game_state_converter = game_state_converter
+        self.synced_data_converter = synced_data_converter
 
         self.model_data = ModelData()
 
@@ -50,8 +53,8 @@ class BitBotsImportStrategy(ImportStrategy):
                 logger.error("No summary found in the MCAP file, skipping processing.")
                 return self.model_data
 
-            last_messages_by_topic = InputData()
             first_used_msg_time = None
+            last_messages_by_topic = InputData()
 
             self.model_data.recording = self._create_recording(summary, file_path)
 
@@ -73,6 +76,14 @@ class BitBotsImportStrategy(ImportStrategy):
                     case "/DynamixelController/command":
                         last_messages_by_topic.joint_command = ros_msg
                         converter = self.synced_data_converter
+                    case "/imu/data":
+                        # @TODO: implement imu conversion
+                        pass
+                    case "/tf":
+                        # @TODO: implement imu data extraction from tf messages
+                        pass
+                    case _:
+                        logger.warning(f"Unhandled topic: {channel.topic} without conversion. Skipping...")
 
                 if self._is_all_synced_data_available(last_messages_by_topic):
                     if first_used_msg_time is None:

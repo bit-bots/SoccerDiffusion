@@ -1,56 +1,24 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
+from ddlitlab2024.dataset.converters.converter import Converter
 from ddlitlab2024.dataset.db import Database
-from ddlitlab2024.dataset.models import GameState, Image, JointCommands, JointStates, Recording
-
-
-@dataclass
-class ImportMetadata:
-    allow_public: bool
-    team_name: str
-    robot_type: str
-    location: str
-    simulated: bool
-
-
-@dataclass
-class Sample[T]:
-    data: T
-    timestamp: float
-    was_sampled_already: bool = False
-
-
-@dataclass
-class InputData:
-    image: Any = None
-    game_state: Any = None
-    joint_state: Any = None
-    joint_command: Any = None
-
-
-@dataclass
-class ModelData:
-    recording: Recording | None = None
-    game_states: list[GameState] = field(default_factory=list)
-    joint_states: list[JointStates] = field(default_factory=list)
-    joint_commands: list[JointCommands] = field(default_factory=list)
-    images: list[Image] = field(default_factory=list)
-
-    def model_instances(self):
-        return [self.recording] + self.game_states + self.joint_states + self.joint_commands + self.images
-
-    def merge(self, other: "ModelData") -> "ModelData":
-        self.game_states.extend(other.game_states)
-        self.joint_states.extend(other.joint_states)
-        self.joint_commands.extend(other.joint_commands)
-        self.images.extend(other.images)
-        return self
+from ddlitlab2024.dataset.imports.data import ImportMetadata, ModelData
 
 
 class ImportStrategy(ABC):
+    def __init__(
+        self,
+        metadata: ImportMetadata,
+        image_converter: Converter,
+        game_state_converter: Converter,
+        synced_data_converter: Converter,
+    ):
+        self.metadata = metadata
+        self.image_converter = image_converter
+        self.game_state_converter = game_state_converter
+        self.synced_data_converter = synced_data_converter
+
     @abstractmethod
     def convert_to_model_data(self, file_path: Path) -> ModelData:
         pass

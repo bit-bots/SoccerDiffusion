@@ -1,7 +1,8 @@
-from ddlitlab2024.dataset.imports.model_importer import InputData, Sample
+from ddlitlab2024.dataset.imports.data import InputData
+from ddlitlab2024.dataset.resampling.resampler import Resampler, Sample
 
 
-class PreviousInterpolationResampler:
+class PreviousInterpolationResampler(Resampler):
     def __init__(self, sample_rate_hz: int):
         self.sample_rate_hz = sample_rate_hz
         self.sampling_step_in_seconds = 1 / sample_rate_hz
@@ -34,17 +35,15 @@ class PreviousInterpolationResampler:
         num_samples = self._num_passed_sampling_steps(relative_timestamp)
 
         for _ in range(num_samples):
+            if self.is_timestamp_before_next_sampling_step(relative_timestamp):
+                self.last_received_data = data
+
             self.last_sampled_data = self.last_received_data
             self.last_sample_step_timestamp = self.last_sample_step_timestamp + self.sampling_step_in_seconds
             samples.append(Sample(data=self.last_sampled_data, timestamp=self.last_sample_step_timestamp))
 
-        if num_samples > 0:
-            return samples
-        else:
-            self.last_received_data = data
-            return [
-                Sample(data=self.last_sampled_data, timestamp=self.last_sample_step_timestamp, was_sampled_already=True)
-            ]
+        self.last_received_data = data
+        return samples
 
     def _num_passed_sampling_steps(self, relative_timestamp: float) -> int:
         if self.last_sample_step_timestamp is None:
@@ -52,3 +51,10 @@ class PreviousInterpolationResampler:
             return 1
 
         return int((relative_timestamp - self.last_sample_step_timestamp) / self.sampling_step_in_seconds)
+
+    def is_timestamp_before_next_sampling_step(self, relative_timestamp: float) -> bool:
+        if self.last_sample_step_timestamp is None:
+            # There was no previous sample, so it is time to sample
+            return True
+
+        return relative_timestamp - self.last_sample_step_timestamp <= self.sampling_step_in_seconds
