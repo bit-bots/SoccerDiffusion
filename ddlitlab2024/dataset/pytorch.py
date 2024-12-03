@@ -179,8 +179,10 @@ class DDLITLab2024Dataset(Dataset):
         # Get the image data
         cursor = self.db_connection.cursor()
         cursor.execute(
-            # Select the last num_samples images before the current time stamp and order them by time stamp in ascending order
-            "SELECT stamp, data FROM Image WHERE recording_id = $1 AND stamp BETWEEN $2 - $3 AND $2 ORDER BY stamp ASC;",
+            # Select the last num_samples images before the current time stamp
+            # and order them by time stamp in ascending order
+            "SELECT stamp, data FROM Image"
+            "WHERE recording_id = $1 AND stamp BETWEEN $2 - $3 AND $2 ORDER BY stamp ASC;",
             (recording_id, end_time_stamp, context_len),
         )
 
@@ -304,8 +306,8 @@ class DDLITLab2024Dataset(Dataset):
         image_stamps, image_data = self.query_image_data(
             recording_id,
             stamp,
-            (self.num_frames_video + 1)
-            / self.max_fps_video,  # The duration is used to narrow down the query for a faster retrieval, so we consider it as an upper bound
+            # The duration is used to narrow down the query for a faster retrieval, so we consider it as an upper bound
+            (self.num_frames_video + 1) / self.max_fps_video,
             self.num_frames_video,
         )
         # Some sanity checks
