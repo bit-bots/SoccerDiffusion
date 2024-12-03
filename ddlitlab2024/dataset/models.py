@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, Integer, String
@@ -59,17 +59,17 @@ class Recording(Base):
     img_width_scaling: Mapped[float] = mapped_column(Float, nullable=False)
     img_height_scaling: Mapped[float] = mapped_column(Float, nullable=False)
 
-    images: Mapped[List["Image"]] = relationship("Image", back_populates="recording", cascade="all, delete-orphan")
-    rotations: Mapped[List["Rotation"]] = relationship(
+    images: Mapped[list["Image"]] = relationship("Image", back_populates="recording", cascade="all, delete-orphan")
+    rotations: Mapped[list["Rotation"]] = relationship(
         "Rotation", back_populates="recording", cascade="all, delete-orphan"
     )
-    joint_states: Mapped[List["JointStates"]] = relationship(
+    joint_states: Mapped[list["JointStates"]] = relationship(
         "JointStates", back_populates="recording", cascade="all, delete-orphan"
     )
-    joint_commands: Mapped[List["JointCommands"]] = relationship(
+    joint_commands: Mapped[list["JointCommands"]] = relationship(
         "JointCommands", back_populates="recording", cascade="all, delete-orphan"
     )
-    game_states: Mapped[List["GameState"]] = relationship(
+    game_states: Mapped[list["GameState"]] = relationship(
         "GameState", back_populates="recording", cascade="all, delete-orphan"
     )
 
