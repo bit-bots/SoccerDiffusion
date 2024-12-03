@@ -1,5 +1,5 @@
 from ddlitlab2024.dataset.converters.converter import Converter
-from ddlitlab2024.dataset.imports.model_importer import InputData, ModelData
+from ddlitlab2024.dataset.imports.data import InputData, ModelData
 from ddlitlab2024.dataset.models import JointCommands, JointStates, Recording
 from ddlitlab2024.dataset.resampling.previous_interpolation_resampler import PreviousInterpolationResampler
 from ddlitlab2024.utils.utils import camelcase_to_snakecase, shift_radian_to_positive_range
@@ -30,13 +30,10 @@ class SyncedDataConverter(Converter):
         models = ModelData()
 
         for sample in self.resampler.resample(data, relative_timestamp):
-            if not sample.was_sampled_already:
-                models.joint_states.append(
-                    self._create_joint_states(sample.data.joint_state, sample.timestamp, recording)
-                )
-                models.joint_commands.append(
-                    self._create_joint_commands(sample.data.joint_command, sample.timestamp, recording)
-                )
+            models.joint_states.append(self._create_joint_states(sample.data.joint_state, sample.timestamp, recording))
+            models.joint_commands.append(
+                self._create_joint_commands(sample.data.joint_command, sample.timestamp, recording)
+            )
 
         return models
 

@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 
-from ddlitlab2024.dataset.imports.model_importer import InputData, ModelData
+from ddlitlab2024.dataset.imports.data import InputData, ModelData
 from ddlitlab2024.dataset.models import Recording
+from ddlitlab2024.dataset.resampling.resampler import Resampler
 
 
 class Converter(ABC):
-    def __init__(self, resampler) -> None:
+    def __init__(self, resampler: Resampler) -> None:
         self.resampler = resampler
 
     @abstractmethod
@@ -23,7 +24,9 @@ class Converter(ABC):
 
     @abstractmethod
     def convert_to_model(self, data: InputData, relative_timestamp: float, recording: Recording) -> ModelData:
-        """_summary_
+        """
+        Convert the input data to our domain model that can be stored in the database and later used for training.
+        The model is contained in a ModelData DTO, for generic handling of different models.
 
         Args:
             data (InputData): The input data to convert to a model (e.g. a gamestate ros message)

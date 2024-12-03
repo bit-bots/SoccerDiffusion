@@ -3,7 +3,7 @@ import numpy as np
 
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.converters.converter import Converter
-from ddlitlab2024.dataset.imports.model_importer import InputData, ModelData
+from ddlitlab2024.dataset.imports.data import InputData, ModelData
 from ddlitlab2024.dataset.models import DEFAULT_IMG_SIZE, Image, Recording
 from ddlitlab2024.dataset.resampling.max_rate_resampler import MaxRateResampler
 
@@ -25,15 +25,14 @@ class ImageConverter(Converter):
 
         if img_scaling_changed:
             logger.error(
-                "The image sizes changed, during one recording! All images of a recording must have the same size."
+                "The image sizes changed during one recording! All images of a recording must have the same size."
             )
 
     def convert_to_model(self, data: InputData, relative_timestamp: float, recording: Recording) -> ModelData:
         models = ModelData()
 
         for sample in self.resampler.resample(data, relative_timestamp):
-            if not sample.was_sampled_already:
-                models.images.append(self._create_image(sample.data.image, sample.timestamp, recording))
+            models.images.append(self._create_image(sample.data.image, sample.timestamp, recording))
 
         return models
 
