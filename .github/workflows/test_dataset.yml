@@ -9,22 +9,24 @@ on:
       - main
 
 jobs:
-  test-db:
-    runs-on: ubuntu-latest
+  test_dataset:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+
+      - name: Install poetry
+        run: pipx install poetry
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-
-      - name: Install Poetry
-        run: |
-          curl -fsSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          python-version: '3.x'
+          cache: "poetry"
 
       - name: Install dependencies
         run: poetry install
