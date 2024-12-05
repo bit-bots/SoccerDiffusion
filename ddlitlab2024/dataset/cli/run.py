@@ -2,6 +2,13 @@
 
 import typing
 
+from ddlitlab2024.dataset.converters.game_state_converter import GameStateConverter
+from ddlitlab2024.dataset.converters.image_converter import ImageConverter
+from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConverter
+from ddlitlab2024.dataset.resampling.max_rate_resampler import MaxRateResampler
+from ddlitlab2024.dataset.resampling.original_rate_resampler import OriginalRateResampler
+from ddlitlab2024.dataset.resampling.previous_interpolation_resampler import PreviousInterpolationResampler
+
 if typing.TYPE_CHECKING:
     from argparse import Namespace
 
@@ -10,7 +17,7 @@ import sys
 
 from rich.console import Console
 
-from ddlitlab2024 import __version__
+from ddlitlab2024 import DEFAULT_RESAMPLE_RATE_HZ, IMAGE_MAX_RESAMPLE_RATE_HZ, __version__
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.cli.args import CLIArgs, CLICommand, DBCommand, ImportType
 from ddlitlab2024.dataset.db import Database
@@ -61,7 +68,18 @@ def main():
                             location="RoboCup2024",
                             simulated=False,
                         )
-                        importer = ModelImporter(db, BitBotsImportStrategy(metadata))
+                        image_converter = ImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
+                        game_state_converter = GameStateConverter(OriginalRateResampler())
+                        synced_data_converter = SyncedDataConverter(
+                            PreviousInterpolationResampler(DEFAULT_RESAMPLE_RATE_HZ)
+                        )
+
+                        importer = ModelImporter(
+                            db,
+                            BitBotsImportStrategy(
+                                metadata, image_converter, game_state_converter, synced_data_converter
+                            ),
+                        )
                         importer.import_to_db(args.file)
 
         sys.exit(0)

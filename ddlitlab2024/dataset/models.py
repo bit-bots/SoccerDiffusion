@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 from sqlalchemy import Boolean, CheckConstraint, DateTime, Float, ForeignKey, Integer, String
@@ -59,17 +59,17 @@ class Recording(Base):
     img_width_scaling: Mapped[float] = mapped_column(Float, nullable=False)
     img_height_scaling: Mapped[float] = mapped_column(Float, nullable=False)
 
-    images: Mapped[List["Image"]] = relationship("Image", back_populates="recording", cascade="all, delete-orphan")
-    rotations: Mapped[List["Rotation"]] = relationship(
+    images: Mapped[list["Image"]] = relationship("Image", back_populates="recording", cascade="all, delete-orphan")
+    rotations: Mapped[list["Rotation"]] = relationship(
         "Rotation", back_populates="recording", cascade="all, delete-orphan"
     )
-    joint_states: Mapped[List["JointStates"]] = relationship(
+    joint_states: Mapped[list["JointStates"]] = relationship(
         "JointStates", back_populates="recording", cascade="all, delete-orphan"
     )
-    joint_commands: Mapped[List["JointCommands"]] = relationship(
+    joint_commands: Mapped[list["JointCommands"]] = relationship(
         "JointCommands", back_populates="recording", cascade="all, delete-orphan"
     )
-    game_states: Mapped[List["GameState"]] = relationship(
+    game_states: Mapped[list["GameState"]] = relationship(
         "GameState", back_populates="recording", cascade="all, delete-orphan"
     )
 
@@ -137,26 +137,26 @@ class JointStates(Base):
     _id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     stamp: Mapped[float] = mapped_column(Float, nullable=False)
     recording_id: Mapped[int] = mapped_column(Integer, ForeignKey("Recording._id"), nullable=False)
-    r_shoulder_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="RShoulderPitch")
-    l_shoulder_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="LShoulderPitch")
-    r_shoulder_roll: Mapped[float] = mapped_column(Float, nullable=False, name="RShoulderRoll")
-    l_shoulder_roll: Mapped[float] = mapped_column(Float, nullable=False, name="LShoulderRoll")
-    r_elbow: Mapped[float] = mapped_column(Float, nullable=False, name="RElbow")
-    l_elbow: Mapped[float] = mapped_column(Float, nullable=False, name="LElbow")
-    r_hip_yaw: Mapped[float] = mapped_column(Float, nullable=False, name="RHipYaw")
-    l_hip_yaw: Mapped[float] = mapped_column(Float, nullable=False, name="LHipYaw")
-    r_hip_roll: Mapped[float] = mapped_column(Float, nullable=False, name="RHipRoll")
-    l_hip_roll: Mapped[float] = mapped_column(Float, nullable=False, name="LHipRoll")
-    r_hip_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="RHipPitch")
-    l_hip_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="LHipPitch")
-    r_knee: Mapped[float] = mapped_column(Float, nullable=False, name="RKnee")
-    l_knee: Mapped[float] = mapped_column(Float, nullable=False, name="LKnee")
-    r_ankle_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="RAnklePitch")
-    l_ankle_pitch: Mapped[float] = mapped_column(Float, nullable=False, name="LAnklePitch")
-    r_ankle_roll: Mapped[float] = mapped_column(Float, nullable=False, name="RAnkleRoll")
-    l_ankle_roll: Mapped[float] = mapped_column(Float, nullable=False, name="LAnkleRoll")
-    head_pan: Mapped[float] = mapped_column(Float, nullable=False, name="HeadPan")
-    head_tilt: Mapped[float] = mapped_column(Float, nullable=False, name="HeadTilt")
+    r_shoulder_pitch: Mapped[float] = mapped_column(Float, default=0.0, name="RShoulderPitch")
+    l_shoulder_pitch: Mapped[float] = mapped_column(Float, default=0.0, name="LShoulderPitch")
+    r_shoulder_roll: Mapped[float] = mapped_column(Float, default=0.0, name="RShoulderRoll")
+    l_shoulder_roll: Mapped[float] = mapped_column(Float, default=0.0, name="LShoulderRoll")
+    r_elbow: Mapped[float] = mapped_column(Float, default=0.0, name="RElbow")
+    l_elbow: Mapped[float] = mapped_column(Float, default=0.0, name="LElbow")
+    r_hip_yaw: Mapped[float] = mapped_column(Float, default=0.0, name="RHipYaw")
+    l_hip_yaw: Mapped[float] = mapped_column(Float, default=0.0, name="LHipYaw")
+    r_hip_roll: Mapped[float] = mapped_column(Float, default=0.0, name="RHipRoll")
+    l_hip_roll: Mapped[float] = mapped_column(Float, default=0.0, name="LHipRoll")
+    r_hip_pitch: Mapped[float] = mapped_column(Float, default=0.0, name="RHipPitch")
+    l_hip_pitch: Mapped[float] = mapped_column(Float, default=0.0, name="LHipPitch")
+    r_knee: Mapped[float] = mapped_column(Float, default=0.0, name="RKnee")
+    l_knee: Mapped[float] = mapped_column(Float, default=0.0, name="LKnee")
+    r_ankle_pitch: Mapped[float] = mapped_column(Float, default=0.0, name="RAnklePitch")
+    l_ankle_pitch: Mapped[float] = mapped_column(Float, default=0.0, name="LAnklePitch")
+    r_ankle_roll: Mapped[float] = mapped_column(Float, default=0.0, name="RAnkleRoll")
+    l_ankle_roll: Mapped[float] = mapped_column(Float, default=0.0, name="LAnkleRoll")
+    head_pan: Mapped[float] = mapped_column(Float, default=0.0, name="HeadPan")
+    head_tilt: Mapped[float] = mapped_column(Float, default=0.0, name="HeadTilt")
 
     recording: Mapped["Recording"] = relationship("Recording", back_populates="joint_states")
 
@@ -191,26 +191,26 @@ class JointCommands(Base):
     _id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     stamp: Mapped[float] = mapped_column(Float, nullable=False)
     recording_id: Mapped[int] = mapped_column(Integer, ForeignKey("Recording._id"), nullable=False)
-    r_shoulder_pitch: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="RShoulderPitch")
-    l_shoulder_pitch: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="LShoulderPitch")
-    r_shoulder_roll: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="RShoulderRoll")
-    l_shoulder_roll: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="LShoulderRoll")
-    r_elbow: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="RElbow")
-    l_elbow: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="LElbow")
-    r_hip_yaw: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="RHipYaw")
-    l_hip_yaw: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="LHipYaw")
-    r_hip_roll: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="RHipRoll")
-    l_hip_roll: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="LHipRoll")
-    r_hip_pitch: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="RHipPitch")
-    l_hip_pitch: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="LHipPitch")
-    r_knee: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="RKnee")
-    l_knee: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="LKnee")
-    r_ankle_pitch: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="RAnklePitch")
-    l_ankle_pitch: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="LAnklePitch")
-    r_ankle_roll: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="RAnkleRoll")
-    l_ankle_roll: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="LAnkleRoll")
-    head_pan: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="HeadPan")
-    head_tilt: Mapped[Optional[float]] = mapped_column(Float, nullable=True, name="HeadTilt")
+    r_shoulder_pitch: Mapped[float] = mapped_column(Float, default=0.0, name="RShoulderPitch")
+    l_shoulder_pitch: Mapped[float] = mapped_column(Float, default=0.0, name="LShoulderPitch")
+    r_shoulder_roll: Mapped[float] = mapped_column(Float, default=0.0, name="RShoulderRoll")
+    l_shoulder_roll: Mapped[float] = mapped_column(Float, default=0.0, name="LShoulderRoll")
+    r_elbow: Mapped[float] = mapped_column(Float, default=0.0, name="RElbow")
+    l_elbow: Mapped[float] = mapped_column(Float, default=0.0, name="LElbow")
+    r_hip_yaw: Mapped[float] = mapped_column(Float, default=0.0, name="RHipYaw")
+    l_hip_yaw: Mapped[float] = mapped_column(Float, default=0.0, name="LHipYaw")
+    r_hip_roll: Mapped[float] = mapped_column(Float, default=0.0, name="RHipRoll")
+    l_hip_roll: Mapped[float] = mapped_column(Float, default=0.0, name="LHipRoll")
+    r_hip_pitch: Mapped[float] = mapped_column(Float, default=0.0, name="RHipPitch")
+    l_hip_pitch: Mapped[float] = mapped_column(Float, default=0.0, name="LHipPitch")
+    r_knee: Mapped[float] = mapped_column(Float, default=0.0, name="RKnee")
+    l_knee: Mapped[float] = mapped_column(Float, default=0.0, name="LKnee")
+    r_ankle_pitch: Mapped[float] = mapped_column(Float, default=0.0, name="RAnklePitch")
+    l_ankle_pitch: Mapped[float] = mapped_column(Float, default=0.0, name="LAnklePitch")
+    r_ankle_roll: Mapped[float] = mapped_column(Float, default=0.0, name="RAnkleRoll")
+    l_ankle_roll: Mapped[float] = mapped_column(Float, default=0.0, name="LAnkleRoll")
+    head_pan: Mapped[float] = mapped_column(Float, default=0.0, name="HeadPan")
+    head_tilt: Mapped[float] = mapped_column(Float, default=0.0, name="HeadTilt")
 
     recording: Mapped["Recording"] = relationship("Recording", back_populates="joint_commands")
 
