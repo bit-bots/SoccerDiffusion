@@ -4,7 +4,7 @@
       "type": "debugpy",
       "request": "launch",
       "name": "Launch DDLitLab2024 import",
-      "program": "${workspaceFolder}/ddlitlab2024/dataset/main.py",
+      "program": "${workspaceFolder}/ddlitlab2024/dataset/cli/run.py",
       "args": [
         "import",
         "rosbag",
