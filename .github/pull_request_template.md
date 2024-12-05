@@ -1,6 +1,3 @@
-# Summary
-<!--- Provide a general summary of the changes -->
-
 ## Proposed changes
 <!--- Describe your changes and why they are necessary. -->
 
@@ -11,7 +8,6 @@
 
 ## Checklist
 
-- [ ] Run `colcon build`
 - [ ] Write documentation
 - [ ] Create issues for future work
 - [ ] Test on your machine
