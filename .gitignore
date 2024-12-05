@@ -1,8 +1,7 @@
 logs/
 *.csv
 *.sqlite
-*.sqlite3
-*.sqlite3-journal
+*.sqlite3*
 *.mcap
 */metadata.yaml
 
