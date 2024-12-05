@@ -60,6 +60,9 @@ class BitBotsImportStrategy(ImportStrategy):
 
             self._log_debug_info(summary, self.model_data.recording)
 
+            # Check if we got any imu messages
+            has_imu_data = any(channel.topic == "/imu/data" for channel in summary.channels.values())
+
             for _, channel, message, ros_msg in reader.iter_decoded_messages(topics=USED_TOPICS):
                 converter: Converter | None = None
 
@@ -77,11 +80,16 @@ class BitBotsImportStrategy(ImportStrategy):
                         last_messages_by_topic.joint_command = ros_msg
                         converter = self.synced_data_converter
                     case "/imu/data":
-                        last_messages_by_topic.rotation = ros_msg
+                        assert has_imu_data, "IMU data is not expected in this MCAP file"
+                        last_messages_by_topic.rotation = ros_msg.orientation
                         converter = self.synced_data_converter
                     case "/tf":
-                        # @TODO: implement imu data extraction from tf messages
-                        pass
+                        if not has_imu_data:
+                            for tf_msg in ros_msg.transforms:
+                                if tf_msg.child_frame_id == "base_footprint" and tf_msg.header.frame_id == "odom":
+                                    # TODO check if we need the inverse
+                                    last_messages_by_topic.rotation = tf_msg.transform.rotation
+                                    converter = self.synced_data_converter
                     case _:
                         logger.warning(f"Unhandled topic: {channel.topic} without conversion. Skipping...")
 
