@@ -6,14 +6,14 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from ddlitlab2024.dataset import logger
-from ddlitlab2024.dataset.models import JointStates, Recording, stamp_to_nanoseconds, stamp_to_seconds_nanoseconds
+from ddlitlab2024.dataset.models import Recording, stamp_to_nanoseconds, stamp_to_seconds_nanoseconds
 
 try:
     import rosbag2_py
     from builtin_interfaces.msg import Time
     from geometry_msgs.msg import Quaternion
     from rclpy.serialization import serialize_message
-    from sensor_msgs.msg import Image
+    from sensor_msgs.msg import Image, JointState
     from std_msgs.msg import Header, String
 except ImportError:
     logger.error(
@@ -205,7 +205,7 @@ def write_joint_states(
             ("head_pan", joint_state.head_pan),
             ("head_tilt", joint_state.head_tilt),
         ]
-        joint_state_msg = JointStates(
+        joint_state_msg = JointState(
             header=Header(stamp=Time(sec=seconds, nanosec=nanoseconds), frame_id="base_link"),
             name=[name for name, _ in joints],
             position=[position for _, position in joints],
@@ -255,7 +255,7 @@ def write_joint_commands(
             ("head_pan", joint_command.head_pan),
             ("head_tilt", joint_command.head_tilt),
         ]
-        joint_command_msg = JointStates(
+        joint_command_msg = JointState(
             header=Header(stamp=Time(sec=seconds, nanosec=nanoseconds), frame_id="base_link"),
             name=[name for name, _ in joints],
             position=[position for _, position in joints],
