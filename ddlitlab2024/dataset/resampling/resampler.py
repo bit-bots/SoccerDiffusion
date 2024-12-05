@@ -1,11 +1,14 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Generic, TypeVar
 
 from ddlitlab2024.dataset.imports.data import InputData
 
+T = TypeVar("T")
+
 
 @dataclass
-class Sample[T]:
+class Sample(Generic[T]):
     data: T
     timestamp: float
 
