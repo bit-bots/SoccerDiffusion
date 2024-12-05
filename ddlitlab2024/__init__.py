@@ -41,4 +41,6 @@ LOGGING_PATH: str = _logging_path
 SESSION_ID: UUID = uuid4()
 
 DB_PATH: Path = Path(os.environ.get("DDLITLAB_DB_PATH", Path.joinpath(Path(__file__).parent, "dataset", "db.sqlite3")))
-print(f"Database path: {DB_PATH}")
+
+DEFAULT_RESAMPLE_RATE_HZ = 50
+IMAGE_MAX_RESAMPLE_RATE_HZ = 10

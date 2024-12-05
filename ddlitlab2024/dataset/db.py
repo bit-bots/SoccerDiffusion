@@ -1,10 +1,20 @@
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.models import Base
+
+
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragmas(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA temp_store=MEMORY")
+    logger.info("Set SQLite to run in write-ahead logging mode, improving parallel write performance")
+    cursor.close()
 
 
 class Database:
