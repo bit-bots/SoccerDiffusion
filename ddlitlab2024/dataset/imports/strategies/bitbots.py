@@ -14,10 +14,7 @@ from ddlitlab2024.dataset.converters.image_converter import ImageConverter
 from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConverter
 from ddlitlab2024.dataset.imports.data import InputData, ModelData
 from ddlitlab2024.dataset.imports.model_importer import ImportMetadata, ImportStrategy
-from ddlitlab2024.dataset.models import (
-    DEFAULT_IMG_SIZE,
-    Recording,
-)
+from ddlitlab2024.dataset.models import DEFAULT_IMG_SIZE, Recording, Rotation
 
 USED_TOPICS = [
     "/DynamixelController/command",
@@ -87,19 +84,13 @@ class BitBotsImportStrategy(ImportStrategy):
                     case "/tf":
                         if not has_imu_data:
                             for tf_msg in ros_msg.transforms:
-                                if tf_msg.child_frame_id == "base_footprint" and tf_msg.header.frame_id == "odom":
-                                    rot = tf_msg.transform.rotation
-
-                                    # Drop the yaw component of the quaternion
-                                    # This is necessary because the IMU data does not contain yaw information
-                                    # and the yaw in the rotation is from the odometry
-                                    # We need to drop it to avoid inconsistencies
-                                    euler = t3d.euler.quat2euler([rot.x, rot.y, rot.z, rot.w], axes="sxyz")
-                                    last_messages_by_topic.rotation = t3d.euler.euler2quat(
-                                        euler[0], euler[1], 0, axes="sxyz"
-                                    )
-                                    # TODO check the math in webots
-                                    # TODO check if we need the inverse
+                                if tf_msg.child_frame_id == "base_footprint" and tf_msg.header.frame_id == "base_link":
+                                    quat = tf_msg.transform.rotation
+                                    # Invert the quaternion to get the rotation from base_footprint
+                                    # to base_link instead of the other way around
+                                    # This is necessary to get pitch and roll angles in the correct frame
+                                    w, x, y, z = t3d.quaternions.qinverse([quat.w, quat.x, quat.y, quat.z])
+                                    last_messages_by_topic.rotation = Rotation(x=x, y=y, z=z, w=w)
                                     converter = self.synced_data_converter
                     case _:
                         logger.warning(f"Unhandled topic: {channel.topic} without conversion. Skipping...")
