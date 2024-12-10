@@ -27,7 +27,8 @@ def connect_to_db(data_base_path: str | Path = DB_PATH, worker_id: int | None = 
     data_base_path = data_base_path
 
     db_connection = sqlite3.connect(data_base_path)
-    #db_connection.execute("PRAGMA locking_mode = EXCLUSIVE")  # Lock the database to prevent writing  # TODO check if necessary
+    # TODO check if necessary
+    # db_connection.execute("PRAGMA locking_mode = EXCLUSIVE")  # Lock the database to prevent writing
     return db_connection
 
 
