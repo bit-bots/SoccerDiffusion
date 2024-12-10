@@ -212,7 +212,7 @@ class DDLITLab2024Dataset(Dataset):
             image_data = [
                 np.zeros((3, 480, 480), dtype=np.uint8) for _ in range(num_frames - len(image_data))
             ] + image_data
-            stamps = [0.0 for _ in range(num_frames - len(stamps))] + stamps
+            stamps = [end_time_stamp - context_len for _ in range(num_frames - len(stamps))] + stamps
 
         # Convert to tensor
         image_data = torch.from_numpy(np.stack(image_data, axis=0)).float()
