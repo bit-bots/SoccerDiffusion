@@ -255,7 +255,7 @@ def write_joint_commands(
             ("head_pan", joint_command.head_pan),
             ("head_tilt", joint_command.head_tilt),
         ]
-        joint_command_msg = JointStates(
+        joint_command_msg = JointState(
             header=Header(stamp=Time(sec=seconds, nanosec=nanoseconds), frame_id="base_link"),
             name=[name for name, _ in joints],
             position=[position for _, position in joints],
