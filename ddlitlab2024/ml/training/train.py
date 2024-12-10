@@ -50,7 +50,7 @@ if __name__ == "__main__":
 
     # Get some samples to estimate the mean and std
     logger.info("Estimating normalization parameters")
-    num_normalization_samples = 10
+    num_normalization_samples = 50
     random_indices = np.random.randint(0, len(dataset), (num_normalization_samples,))
     normalization_samples = torch.cat([dataset[i].joint_command_history for i in tqdm(random_indices)], dim=0)
     normalizer = Normalizer.fit(normalization_samples.to(device))
@@ -81,6 +81,7 @@ if __name__ == "__main__":
     # Add normalization parameters to the model
     model.mean = normalizer.mean
     model.std = normalizer.std
+    assert all(model.std != 0), "Normalization std is zero, this makes no sense. Some joints are constant."
 
     # Utilize an Exponential Moving Average (EMA) for the model to smooth out the training process
     ema = EMA(model, beta=0.9999)
