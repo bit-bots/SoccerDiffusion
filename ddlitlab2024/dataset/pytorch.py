@@ -298,7 +298,7 @@ class DDLITLab2024Dataset(Dataset):
         # Game state and image data are not synchronized with the other data
 
         # Calculate the sample index in the recording
-        sample_index = int(idx - start_sample)
+        sample_index = int(idx * self.trajectory_stride - start_sample)
         # Calculate the time stamp of the sample
         stamp = sample_index / self.sampling_rate
 
