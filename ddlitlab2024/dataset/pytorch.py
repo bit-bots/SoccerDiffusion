@@ -181,7 +181,7 @@ class DDLITLab2024Dataset(Dataset):
         cursor.execute(
             # Select the last num_samples images before the current time stamp
             # and order them by time stamp in ascending order
-            "SELECT stamp, data FROM Image"
+            "SELECT stamp, data FROM Image "
             "WHERE recording_id = $1 AND stamp BETWEEN $2 - $3 AND $2 ORDER BY stamp ASC;",
             (recording_id, end_time_stamp, context_len),
         )
