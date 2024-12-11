@@ -32,8 +32,7 @@ if __name__ == "__main__":
     batch_size = 16
     lr = 1e-4
     train_denoising_timesteps = 1000
-    image_context_length = 30
-    trajectory_prediction_length = 10
+    image_context_length = 10
     action_context_length = 100
     imu_context_length = 100
     joint_state_context_length = 100
