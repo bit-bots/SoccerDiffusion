@@ -24,12 +24,8 @@ def connect_to_db(data_base_path: str | Path = DB_PATH, worker_id: int | None = 
     data_base_path = str(data_base_path)
     assert data_base_path.endswith(".sqlite3"), "The database should be a sqlite file"
     assert os.path.exists(data_base_path), f"The database file '{data_base_path}' does not exist"
-    data_base_path = data_base_path
 
-    db_connection = sqlite3.connect(data_base_path)
-    # TODO check if necessary
-    # db_connection.execute("PRAGMA locking_mode = EXCLUSIVE")  # Lock the database to prevent writing
-    return db_connection
+    return sqlite3.connect(f"file:{data_base_path}?immutable=1", uri=True) # Open the database in read-only mode
 
 
 def worker_init_fn(worker_id):
