@@ -32,10 +32,22 @@ if __name__ == "__main__":
     batch_size = 16
     lr = 1e-4
     train_denoising_timesteps = 1000
+    image_context_length = 30
+    trajectory_prediction_length = 10
+    action_context_length = 100
+    imu_context_length = 100
+    joint_state_context_length = 100
+    num_normalization_samples = 50
 
     # Load the dataset
     logger.info("Create dataset objects")
-    dataset = DDLITLab2024Dataset()
+    dataset = DDLITLab2024Dataset(
+        num_frames_video=image_context_length,
+        num_samples_joint_trajectory_future=trajectory_prediction_length,
+        num_samples_joint_trajectory=action_context_length,
+        num_samples_imu=imu_context_length,
+        num_samples_joint_states=joint_state_context_length,
+    )
     num_workers = 5
     dataloader = DataLoader(
         dataset,
@@ -50,7 +62,6 @@ if __name__ == "__main__":
 
     # Get some samples to estimate the mean and std
     logger.info("Estimating normalization parameters")
-    num_normalization_samples = 50
     random_indices = np.random.randint(0, len(dataset), (num_normalization_samples,))
     normalization_samples = torch.cat([dataset[i].joint_command_history for i in tqdm(random_indices)], dim=0)
     normalizer = Normalizer.fit(normalization_samples.to(device))
@@ -61,21 +72,21 @@ if __name__ == "__main__":
         hidden_dim=hidden_dim,
         use_action_history=True,
         num_action_history_encoder_layers=2,
-        max_action_context_length=100,
+        max_action_context_length=action_context_length,
         use_imu=True,
         imu_orientation_embedding_method=IMUEncoder.OrientationEmbeddingMethod.QUATERNION,
         num_imu_encoder_layers=2,
-        max_imu_context_length=100,
+        max_imu_context_length=imu_context_length,
         use_joint_states=True,
         joint_state_encoder_layers=2,
-        max_joint_state_context_length=100,
+        max_joint_state_context_length=joint_state_context_length,
         use_images=True,
         image_sequence_encoder_type=SequenceEncoderType.TRANSFORMER,
         image_encoder_type=ImageEncoderType.RESNET18,
         num_image_sequence_encoder_layers=1,
-        max_image_context_length=10,
+        max_image_context_length=image_context_length,
         num_decoder_layers=4,
-        trajectory_prediction_length=10,
+        trajectory_prediction_length=trajectory_prediction_length,
     ).to(device)
 
     # Add normalization parameters to the model
