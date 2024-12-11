@@ -25,7 +25,7 @@ def connect_to_db(data_base_path: str | Path = DB_PATH, worker_id: int | None = 
     assert data_base_path.endswith(".sqlite3"), "The database should be a sqlite file"
     assert os.path.exists(data_base_path), f"The database file '{data_base_path}' does not exist"
 
-    return sqlite3.connect(f"file:{data_base_path}?immutable=1", uri=True) # Open the database in read-only mode
+    return sqlite3.connect(f"file:{data_base_path}?immutable=1", uri=True)  # Open the database in read-only mode
 
 
 def worker_init_fn(worker_id):
@@ -91,9 +91,7 @@ class DDLITLab2024Dataset(Dataset):
             assert num_data_points > 0, "Recording length is negative or zero"
             total_samples_before = self.num_samples
             # Calculate the number of batches that can be build from the recording including the stride
-            self.num_samples += int(
-                (num_data_points - self.num_samples_joint_trajectory_future) / self.trajectory_stride
-            )
+            self.num_samples += int(num_data_points / self.trajectory_stride)
             # Store the boundaries of the samples for later retrieval
             self.sample_boundaries.append((total_samples_before, self.num_samples, recording_id))
 
@@ -295,9 +293,13 @@ class DDLITLab2024Dataset(Dataset):
         # Game state and image data are not synchronized with the other data
 
         # Calculate the sample index in the recording
-        sample_index = int(idx * self.trajectory_stride - start_sample)
+        sample_index = int(idx - start_sample)
+        # Calculate the index of the joint command where this sample starts
+        # We assume that the joint command, joint state and imu data are roughly synchronized
+        # Therefore we can use the joint command index as a reference
+        sample_joint_command_index = sample_index * self.trajectory_stride
         # Calculate the time stamp of the sample
-        stamp = sample_index / self.sampling_rate
+        stamp = sample_joint_command_index / self.sampling_rate
 
         # Get the image data
         image_stamps, image_data = self.query_image_data(
@@ -317,21 +319,22 @@ class DDLITLab2024Dataset(Dataset):
 
         # Get the joint command target (future)
         joint_command = self.query_joint_data(
-            recording_id, sample_index, self.num_samples_joint_trajectory_future, "JointCommands"
+            recording_id, sample_joint_command_index, self.num_samples_joint_trajectory_future, "JointCommands"
         )
+        assert len(joint_command) == self.num_samples_joint_trajectory_future, "The joint command has the wrong length"
 
         # Get the joint command history
         joint_command_history = self.query_joint_data_history(
-            recording_id, sample_index, self.num_samples_joint_trajectory, "JointCommands"
+            recording_id, sample_joint_command_index, self.num_samples_joint_trajectory, "JointCommands"
         )
 
         # Get the joint state
         joint_state = self.query_joint_data_history(
-            recording_id, sample_index, self.num_samples_joint_states, "JointStates"
+            recording_id, sample_joint_command_index, self.num_samples_joint_states, "JointStates"
         )
 
         # Get the robot rotation (IMU data)
-        robot_rotation = self.query_imu_data(recording_id, sample_index, self.num_samples_imu)
+        robot_rotation = self.query_imu_data(recording_id, sample_joint_command_index, self.num_samples_imu)
 
         # Get the game state
         game_state = self.query_current_game_state(recording_id, stamp)
