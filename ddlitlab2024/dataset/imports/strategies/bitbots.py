@@ -126,9 +126,7 @@ class BitBotsImportStrategy(ImportStrategy):
         return self.model_data
 
     def _is_all_synced_data_available(self, data: InputData) -> bool:
-        # @TODO: add check for IMU data, when tf conversion to rotation is implemented
-        # return data.joint_command is not None and data.joint_state is not None and data.rotation is not None
-        return data.joint_command is not None and data.joint_state is not None
+        return data.joint_command is not None and data.joint_state is not None and data.rotation is not None
 
     def _create_recording(self, summary: Summary, mcap_file_path: Path) -> Recording:
         start_timestamp, end_timestamp = self._extract_timeframe(summary)
