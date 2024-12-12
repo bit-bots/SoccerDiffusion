@@ -127,7 +127,7 @@ if __name__ == "__main__":
                 torch.randint(0, scheduler.config["num_train_timesteps"], (joint_targets.size(0),)).long().to(device)
             )
 
-            # Sample noise to add to the entire trajectory
+            # Sample gaussian noise to add to the entire trajectory
             noise = torch.randn_like(joint_targets).to(device)
 
             # Forward diffusion: Add noise to the entire trajectory at the random timestep
