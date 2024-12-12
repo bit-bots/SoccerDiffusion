@@ -105,11 +105,11 @@ if __name__ == "__main__":
     scheduler.config["num_train_timesteps"] = train_denoising_timesteps
 
     # Training loop
-    for epoch in range(epochs):  # Number of training epochs
+    for epoch in range(epochs):
         mean_loss = 0
 
         # Iterate over the dataset
-        for i, batch in enumerate(tqdm(dataloader)):
+        for i, batch in enumerate(pbar := tqdm(dataloader)):
             # Move the data to the device
             batch = {k: v.to(device) for k, v in asdict(batch).items()}
 
@@ -147,8 +147,9 @@ if __name__ == "__main__":
             lr_scheduler.step()
             ema.update()
 
-            if (i + 1) % 5 == 0:
-                print(f"Epoch {epoch}, Loss: {mean_loss / i}, LR: {lr_scheduler.get_last_lr()[0]}")
+            pbar.set_postfix_str(
+                f"Epoch {epoch}, Loss: {mean_loss / (i + 1):.05f}, LR: {lr_scheduler.get_last_lr()[0]:0.5f}"
+            )
 
     # Save the model
     torch.save(ema.state_dict(), "trajectory_transformer_model.pth")
