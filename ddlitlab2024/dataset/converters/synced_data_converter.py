@@ -1,19 +1,7 @@
 from ddlitlab2024.dataset.converters.converter import Converter
-from ddlitlab2024.dataset.imports.data import InputData, ModelData
+from ddlitlab2024.dataset.imports.data import InputData, ModelData, joints_dict_from_msg_data
 from ddlitlab2024.dataset.models import JointCommands, JointStates, Recording, Rotation
 from ddlitlab2024.dataset.resampling.previous_interpolation_resampler import PreviousInterpolationResampler
-from ddlitlab2024.utils.utils import camelcase_to_snakecase, shift_radian_to_positive_range
-
-
-def joints_dict_from_msg_data(joints_data: list[tuple[str, float]]) -> dict[str, float]:
-    joints_dict = {}
-
-    for name, position in joints_data:
-        key = camelcase_to_snakecase(name)
-        value = shift_radian_to_positive_range(position)
-        joints_dict[key] = value
-
-    return joints_dict
 
 
 class SyncedDataConverter(Converter):
@@ -25,7 +13,9 @@ class SyncedDataConverter(Converter):
 
     def convert_to_model(self, data: InputData, relative_timestamp: float, recording: Recording) -> ModelData:
         assert data.joint_state is not None, "joint_states are required in synced resampling data"
-        assert data.joint_command is not None, "joint_commands are required in synced resampling data"
+        assert all(
+            command is not None for command in data.joint_command.values()
+        ), "joint_commands are required in synced resampling data"
         assert data.rotation is not None, "IMU rotation is required in synced resampling data"
 
         models = ModelData()
@@ -50,21 +40,13 @@ class SyncedDataConverter(Converter):
         )
 
     def _create_joint_states(self, msg, sampling_timestamp: float, recording: Recording) -> JointStates:
-        if msg is None:
-            return JointStates(stamp=sampling_timestamp, recording=recording)
-        else:
-            joint_states_data = list(zip(msg.name, msg.position))
+        joint_states_data = list(zip(msg.name, msg.position))
 
-            return JointStates(
-                stamp=sampling_timestamp, recording=recording, **joints_dict_from_msg_data(joint_states_data)
-            )
+        return JointStates(
+            stamp=sampling_timestamp, recording=recording, **joints_dict_from_msg_data(joint_states_data)
+        )
 
-    def _create_joint_commands(self, msg, sampling_timestamp: float, recording: Recording) -> JointCommands:
-        if msg is None:
-            return JointCommands(stamp=sampling_timestamp, recording=recording)
-        else:
-            joint_commands_data = list(zip(msg.joint_names, msg.positions))
-
-            return JointCommands(
-                stamp=sampling_timestamp, recording=recording, **joints_dict_from_msg_data(joint_commands_data)
-            )
+    def _create_joint_commands(
+        self, joint_commands_data, sampling_timestamp: float, recording: Recording
+    ) -> JointCommands:
+        return JointCommands(stamp=sampling_timestamp, recording=recording, **joint_commands_data)
