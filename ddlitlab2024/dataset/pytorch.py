@@ -104,12 +104,10 @@ class DDLITLab2024Dataset(Dataset):
 
         # Print out metadata
         cursor = self.db_connection.cursor()
-        cursor.execute("SELECT team_name, start_time, original_file FROM Recording")
+        cursor.execute("SELECT team_name, start_time, location, original_file FROM Recording")
         recordings = cursor.fetchall()
-        logger.info(
-            f"Using the following recordings:\n{tabulate(
-                recordings, headers=['Team name', 'Start time', 'Original file'])}"
-        )
+        table = tabulate(recordings, headers=["Team name", "Start time", "Location", "Original file"])
+        logger.info(f"Using the following recordings:\n{table}")
 
         # SQL query that get the first and last timestamp of the joint command for each recording
         cursor = self.db_connection.cursor()
