@@ -1,4 +1,5 @@
 from dataclasses import asdict
+from functools import partial
 
 import numpy as np
 import torch
@@ -17,6 +18,8 @@ from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# Fix tqdm when the terminal width changes, this is for some reason not a default, therfore we make it one
+tqdm = partial(tqdm, dynamic_ncols=True)
 
 if __name__ == "__main__":
     logger.info("Starting training")
