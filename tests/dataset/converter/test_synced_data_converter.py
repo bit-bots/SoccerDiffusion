@@ -76,6 +76,7 @@ def test_converts_all_resampled_joint_states(converter, input_data, recording):
         assert joint_state.l_hip_yaw == pytest.approx(np.pi, abs=1e-5)
         assert joint_state.head_tilt == 0.0
 
+
 def test_converts_all_resampled_joint_commands(converter, input_data, recording):
     converter.resampler.resample.return_value = [
         Sample(data=input_data, timestamp=0.0),
@@ -95,6 +96,7 @@ def test_converts_all_resampled_joint_commands(converter, input_data, recording)
         assert joint_command.r_hip_yaw == np.pi
         assert joint_command.l_hip_yaw == pytest.approx(np.pi, abs=1e-5)
         assert joint_command.head_tilt == 0.0
+
 
 @pytest.fixture
 def input_data(imu_msg, joint_position_msg, joint_command_msg):
