@@ -51,7 +51,7 @@ def shift_radian_to_positive_range(radian: float) -> float:
     :param radian: The pricipal range radian radian [-pi, pi].
     :return: The positive principal range radian [0, 2pi].
     """
-    return (radian + 2 * np.pi) % (2 * np.pi)
+    return (radian + 3 * np.pi) % (2 * np.pi)
 
 
 def timestamp_in_ns(seconds: int, nanoseconds: int) -> int:
