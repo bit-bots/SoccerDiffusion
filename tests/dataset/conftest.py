@@ -63,4 +63,3 @@ def joint_command_msg():
 @pytest.fixture
 def joint_position_msg():
     return SimpleNamespace(name=joint_names, position=positions)
-
