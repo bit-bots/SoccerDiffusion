@@ -31,7 +31,7 @@ if __name__ == "__main__":
     num_heads = 4
     action_context_length = 100
     trajectory_prediction_length = 10
-    epochs = 50
+    epochs = 500
     batch_size = 16
     lr = 1e-4
     train_denoising_timesteps = 1000
