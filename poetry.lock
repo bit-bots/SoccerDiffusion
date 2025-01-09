@@ -1521,6 +1521,22 @@ files = [
 ]
 
 [[package]]
+name = "pybh"
+version = "0.3.10rc0"
+description = "Python bindings for B-Human."
+optional = false
+python-versions = "*"
+files = []
+develop = false
+
+[package.source]
+type = "git"
+url = "https://github.com/bhuman/BHumanCodeRelease.git"
+reference = "master"
+resolved_reference = "6072893a3dc2b39604e7b37c6bcf0b63afcde692"
+subdirectory = "Make/Python"
+
+[[package]]
 name = "pycparser"
 version = "2.22"
 description = "C parser in Python"
@@ -2435,4 +2451,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "fddf0dd3a0a31220596fb831aec5786895e61c946ce7be1498d36038d7383c7e"
+content-hash = "6adca1b92be61adefeb1f5880e2760fd614d90d8b81d8a2bbedea5e00b40bb69"
