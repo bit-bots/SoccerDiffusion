@@ -2,13 +2,6 @@
 
 import typing
 
-from ddlitlab2024.dataset.converters.game_state_converter import GameStateConverter
-from ddlitlab2024.dataset.converters.image_converter import ImageConverter
-from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConverter
-from ddlitlab2024.dataset.resampling.max_rate_resampler import MaxRateResampler
-from ddlitlab2024.dataset.resampling.original_rate_resampler import OriginalRateResampler
-from ddlitlab2024.dataset.resampling.previous_interpolation_resampler import PreviousInterpolationResampler
-
 if typing.TYPE_CHECKING:
     from argparse import Namespace
 
@@ -20,7 +13,14 @@ from rich.console import Console
 from ddlitlab2024 import DEFAULT_RESAMPLE_RATE_HZ, IMAGE_MAX_RESAMPLE_RATE_HZ, __version__
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.cli.args import CLIArgs, CLICommand, DBCommand, ImportType
+from ddlitlab2024.dataset.converters.game_state_converter import GameStateConverter
+from ddlitlab2024.dataset.converters.image_converter import ImageConverter
+from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConverter
 from ddlitlab2024.dataset.db import Database
+from ddlitlab2024.dataset.imports.model_importer import ImportStrategy
+from ddlitlab2024.dataset.resampling.max_rate_resampler import MaxRateResampler
+from ddlitlab2024.dataset.resampling.original_rate_resampler import OriginalRateResampler
+from ddlitlab2024.dataset.resampling.previous_interpolation_resampler import PreviousInterpolationResampler
 
 err_console = Console(stderr=True)
 
@@ -56,11 +56,12 @@ def main():
             case CLICommand.IMPORT:
                 from ddlitlab2024.dataset.imports.model_importer import ImportMetadata, ModelImporter
 
-                match args.type:
-                    case ImportType.ROS_BAG:
-                        from ddlitlab2024.dataset.imports.strategies.bitbots import BitBotsImportStrategy
+                import_strategy: ImportStrategy
 
-                        logger.info(f"Trying to import file '{args.file}' to database...")
+                match args.type:
+                    case ImportType.BIT_BOTS:
+                        from ddlitlab2024.dataset.imports.strategies.bit_bots import BitBotsImportStrategy
+
                         metadata = ImportMetadata(
                             allow_public=True,
                             team_name="Bit-Bots",
@@ -73,14 +74,35 @@ def main():
                         synced_data_converter = SyncedDataConverter(
                             PreviousInterpolationResampler(DEFAULT_RESAMPLE_RATE_HZ)
                         )
-
-                        importer = ModelImporter(
-                            db,
-                            BitBotsImportStrategy(
-                                metadata, image_converter, game_state_converter, synced_data_converter
-                            ),
+                        import_strategy = BitBotsImportStrategy(
+                            metadata, image_converter, game_state_converter, synced_data_converter
                         )
-                        importer.import_to_db(args.file)
+
+                    case ImportType.B_HUMAN:
+                        from ddlitlab2024.dataset.imports.strategies.b_human import BHumanImportStrategy
+
+                        metadata = ImportMetadata(
+                            allow_public=False,
+                            team_name="B-Human",
+                            robot_type="NaoV6",
+                            location="TODO",  # TODO
+                            simulated=False,
+                        )
+                        image_converter = ImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
+                        game_state_converter = GameStateConverter(OriginalRateResampler())
+                        synced_data_converter = SyncedDataConverter(
+                            PreviousInterpolationResampler(DEFAULT_RESAMPLE_RATE_HZ)
+                        )
+                        import_strategy = BHumanImportStrategy(
+                            metadata, image_converter, game_state_converter, synced_data_converter
+                        )
+
+                    case _:
+                        raise ValueError(f"Unknown import type: {args.type}")
+
+                logger.info(f"Trying to import file '{args.file}' to database...")
+                importer = ModelImporter(db, import_strategy)
+                importer.import_to_db(args.file)
 
         sys.exit(0)
     except Exception as e:
