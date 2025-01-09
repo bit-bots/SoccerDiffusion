@@ -36,7 +36,7 @@ if __name__ == "__main__":
     joint_state_context_length = 100
     num_normalization_samples = 50
     num_joints = 20
-    checkpoint = "/homes/17vahl/ddlitlab2024/ddlitlab2024/ml/training/trajectory_transformer_model_fixed_norm.pth"
+    checkpoint = "/homes/17vahl/ddlitlab2024/ddlitlab2024/ml/training/trajectory_transformer_model.pth"
 
     logger.info("Load model")
     model = End2EndDiffusionTransformer(
