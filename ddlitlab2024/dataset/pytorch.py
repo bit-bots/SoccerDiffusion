@@ -14,9 +14,9 @@ from torch.utils.data import DataLoader, Dataset
 
 from ddlitlab2024 import DB_PATH
 from ddlitlab2024.dataset import logger
-from ddlitlab2024.dataset.models import JointStates, RobotState
+from ddlitlab2024.dataset.models import RobotState
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
-from ddlitlab2024.utils.utils import quats_to_5d
+from ddlitlab2024.utils.utils import JOINT_NAMES_ORDER, quats_to_5d
 
 
 def connect_to_db(data_base_path: str | Path = DB_PATH, worker_id: int | None = None) -> sqlite3.Connection:
@@ -78,30 +78,6 @@ class DDLITLab2024Dataset(Dataset):
         self.trajectory_stride = trajectory_stride
         self.num_joints = num_joints
 
-        # Define the naming and default ordering of the joints
-        self.joint_names = [
-            JointStates.head_pan.name,
-            JointStates.head_tilt.name,
-            JointStates.l_ankle_pitch.name,
-            JointStates.l_ankle_roll.name,
-            JointStates.l_elbow.name,
-            JointStates.l_hip_pitch.name,
-            JointStates.l_hip_roll.name,
-            JointStates.l_hip_yaw.name,
-            JointStates.l_knee.name,
-            JointStates.l_shoulder_pitch.name,
-            JointStates.l_shoulder_roll.name,
-            JointStates.r_ankle_pitch.name,
-            JointStates.r_ankle_roll.name,
-            JointStates.r_elbow.name,
-            JointStates.r_hip_pitch.name,
-            JointStates.r_hip_roll.name,
-            JointStates.r_hip_yaw.name,
-            JointStates.r_knee.name,
-            JointStates.r_shoulder_pitch.name,
-            JointStates.r_shoulder_roll.name,
-        ]
-
         # Print out metadata
         cursor = self.db_connection.cursor()
         cursor.execute("SELECT team_name, start_time, location, original_file FROM Recording")
@@ -142,7 +118,7 @@ class DDLITLab2024Dataset(Dataset):
         )
 
         # Convert to numpy array, keep only the joint angle columns in alphabetical order
-        raw_joint_data = raw_joint_data[self.joint_names].to_numpy(dtype=np.float32)
+        raw_joint_data = raw_joint_data[JOINT_NAMES_ORDER].to_numpy(dtype=np.float32)
 
         assert raw_joint_data.shape[1] == self.num_joints, "The number of joints is not correct"
 

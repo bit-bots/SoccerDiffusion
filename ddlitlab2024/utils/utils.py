@@ -3,6 +3,8 @@ import re
 import numpy as np
 from transforms3d.quaternions import quat2axangle
 
+from ddlitlab2024.dataset.models import JointStates
+
 CAMELCASE_TO_SNAKECASE_REGEX = re.compile(r"(?<!^)(?=[A-Z])")
 
 
@@ -73,3 +75,27 @@ def camelcase_to_snakecase(name: str) -> str:
     Convert a camelCase string to snake_case.
     """
     return CAMELCASE_TO_SNAKECASE_REGEX.sub("_", name).lower()
+
+
+JOINT_NAMES_ORDER = [
+    JointStates.head_pan.name,
+    JointStates.head_tilt.name,
+    JointStates.l_ankle_pitch.name,
+    JointStates.l_ankle_roll.name,
+    JointStates.l_elbow.name,
+    JointStates.l_hip_pitch.name,
+    JointStates.l_hip_roll.name,
+    JointStates.l_hip_yaw.name,
+    JointStates.l_knee.name,
+    JointStates.l_shoulder_pitch.name,
+    JointStates.l_shoulder_roll.name,
+    JointStates.r_ankle_pitch.name,
+    JointStates.r_ankle_roll.name,
+    JointStates.r_elbow.name,
+    JointStates.r_hip_pitch.name,
+    JointStates.r_hip_roll.name,
+    JointStates.r_hip_yaw.name,
+    JointStates.r_knee.name,
+    JointStates.r_shoulder_pitch.name,
+    JointStates.r_shoulder_roll.name,
+]
