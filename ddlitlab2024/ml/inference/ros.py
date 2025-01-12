@@ -22,6 +22,15 @@ from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncode
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 from ddlitlab2024.utils.utils import JOINT_NAMES_ORDER
 
+from ddlitlab2024.dataset.pytorch import DDLITLab2024Dataset, Normalizer, worker_init_fn
+from ddlitlab2024.ml import logger
+from ddlitlab2024.ml.model import End2EndDiffusionTransformer
+from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType
+from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
+
+from torch.utils.data import DataLoader
+
+
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -46,7 +55,7 @@ class Inference(Node):
         self.imu_context_length = 100
         self.joint_state_context_length = 100
         self.num_joints = 20
-        checkpoint = "/homes/17vahl/ddlitlab2024/ddlitlab2024/ml/training/trajectory_transformer_model_fixed_norm.pth"
+        checkpoint = "/homes/17vahl/ddlitlab2024/ddlitlab2024/ml/training/trajectory_transformer_model_500_epoch_xmas.pth"
 
         # Subscribe to all the input topics
         self.joint_state_sub = self.create_subscription(JointState, "/joint_states", self.joint_state_callback, 10)
@@ -74,10 +83,42 @@ class Inference(Node):
         self.latest_game_state = None
 
         # Add default values to the buffers
-        self.image_embeddings = [torch.zeros(3, 480, 480)] * self.image_context_length
-        self.imu_data = [torch.tensor([0.0, 0.0, 0.0, 1.0])] * self.imu_context_length
-        self.joint_state_data = [torch.zeros(len(JOINT_NAMES_ORDER))] * self.joint_state_context_length
-        self.joint_command_data = [torch.zeros(self.num_joints)] * self.action_context_length
+        #self.image_embeddings = [torch.zeros(3, 480, 480)] * self.image_context_length
+        #self.imu_data = [torch.tensor([0.0, 0.0, 0.0, 1.0])] * self.imu_context_length
+        #self.joint_state_data = [torch.zeros(len(JOINT_NAMES_ORDER))] * self.joint_state_context_length
+        #self.joint_command_data = [torch.zeros(self.num_joints)] * self.action_context_length
+
+         # Create Dataset object
+        dataset = DDLITLab2024Dataset(
+            num_joints=self.num_joints,
+            num_frames_video=self.image_context_length,
+            num_samples_joint_trajectory_future=self.trajectory_prediction_length,
+            num_samples_joint_trajectory=self.action_context_length,
+            num_samples_imu=self.imu_context_length,
+            num_samples_joint_states=self.joint_state_context_length,
+        )
+
+        # Create DataLoader object
+        num_workers = 5
+        dataloader = DataLoader(
+            dataset,
+            batch_size=1,
+            shuffle=True,
+            collate_fn=DDLITLab2024Dataset.collate_fn,
+            persistent_workers=num_workers > 1,
+            num_workers=num_workers,
+            worker_init_fn=worker_init_fn,
+        )
+
+        dataloader = iter(dataloader)
+
+        batch = next(dataloader)
+        
+        # Add the data from the dataset to the buffers
+        self.image_embeddings = [x for x in batch.image_data.squeeze(0)]
+        self.imu_data = [x for x in batch.rotation.squeeze(0)]
+        self.joint_state_data = [x for x in batch.joint_state.squeeze(0)]
+        self.joint_command_data = [x for x in batch.joint_command_history.squeeze(0)]
 
         # TF buffer to estimate imu similarly to the way we fixed the dataset
         self.tf_buffer = Buffer(self, Duration(seconds=10))
@@ -204,8 +245,10 @@ class Inference(Node):
             % (2 * np.pi),
             "image_data": torch.stack(list(self.image_embeddings), dim=0).unsqueeze(0).to(device),
             "rotation": torch.stack(list(self.imu_data), dim=0).unsqueeze(0).to(device),
-            "joint_command_history": torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device),
+            "joint_command_history": (torch.stack(list(self.joint_state_data), dim=0).unsqueeze(0).to(device) + 3 * np.pi)
+            % (2 * np.pi) # torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device),
         }
+
 
         # Perform the denoising process
         trajectory = torch.randn(1, self.trajectory_prediction_length, self.num_joints).to(device)
@@ -232,35 +275,35 @@ class Inference(Node):
         self.get_logger().info("Publishing trajectory")
 
         # Store the trajectory in the joint command buffer (action history)
-        # self.joint_command_data.append(trajectory[0, 0].cpu())
+        self.joint_command_data.append(trajectory[0, -1].cpu())
 
         # Publish the trajectory
-        # self.joint_state_pub.publish(
-        #    JointCommand(
-        #        joint_names=JOINT_NAMES_ORDER,
-        #        velocities=[-1.0] * len(JOINT_NAMES_ORDER),
-        #        accelerations=[-1.0] * len(JOINT_NAMES_ORDER),
-        #        max_currents=[-1.0] * len(JOINT_NAMES_ORDER),
-        #        positions=trajectory[0, 0].cpu().numpy() - np.pi,
-        #    )
-        # )
+        self.joint_state_pub.publish(
+           JointCommand(
+               joint_names=JOINT_NAMES_ORDER,
+               velocities=[-1.0] * len(JOINT_NAMES_ORDER),
+               accelerations=[-1.0] * len(JOINT_NAMES_ORDER),
+               max_currents=[-1.0] * len(JOINT_NAMES_ORDER),
+               positions=trajectory[0, -1].cpu().numpy() - np.pi,
+           )
+        )
 
         # Store the trajectory in the joint command buffer (action history)
-        for i in range(self.trajectory_prediction_length):
-            self.joint_command_data.append(trajectory[0, i].cpu())
+        #for i in range(self.trajectory_prediction_length):
+        #    self.joint_command_data.append(trajectory[0, i].cpu())
 
-        # Publish the trajectory one by one
-        for i in range(self.trajectory_prediction_length):
-            time.sleep(1 / self.sample_rate)
-            self.joint_state_pub.publish(
-                JointCommand(
-                    joint_names=JOINT_NAMES_ORDER,
-                    velocities=[-1.0] * len(JOINT_NAMES_ORDER),
-                    accelerations=[-1.0] * len(JOINT_NAMES_ORDER),
-                    max_currents=[-1.0] * len(JOINT_NAMES_ORDER),
-                    positions=trajectory[0, i].cpu().numpy() - np.pi,
-                )
-            )
+        ## Publish the trajectory one by one
+        #for i in range(self.trajectory_prediction_length):
+        #    time.sleep(1 / self.sample_rate)
+        #    self.joint_state_pub.publish(
+        #        JointCommand(
+        #            joint_names=JOINT_NAMES_ORDER,
+        #            velocities=[-1.0] * len(JOINT_NAMES_ORDER),
+        #            accelerations=[-1.0] * len(JOINT_NAMES_ORDER),
+        #            max_currents=[-1.0] * len(JOINT_NAMES_ORDER),
+        #            positions=trajectory[0, i].cpu().numpy() - np.pi,
+        #        )
+        #    )
 
 
 def main(args=None):
