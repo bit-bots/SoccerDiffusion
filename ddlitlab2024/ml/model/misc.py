@@ -48,12 +48,12 @@ class PositionalEncoding(nn.Module):
         :param max_len: The maximum length of the input sequences.
         """
         super().__init__()
-        pe = torch.zeros(max_len, d_model)
+        self.register_buffer('pe', torch.zeros(1, max_len, d_model), persistent=False)
+
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        self.pe = pe.unsqueeze(0)
+        self.pe[0, :, 0::2] = torch.sin(position * div_term)
+        self.pe[0, :, 1::2] = torch.cos(position * div_term)
 
     def forward(self, x):
         """
@@ -62,4 +62,4 @@ class PositionalEncoding(nn.Module):
         :param x: The input tensor.
         :return: The input tensor with the positional encoding added.
         """
-        return x + self.pe[:, : x.size(1)].to(x.device)
+        return x + self.pe[:, : x.size(1)]
