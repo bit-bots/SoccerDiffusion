@@ -48,7 +48,7 @@ class PositionalEncoding(nn.Module):
         :param max_len: The maximum length of the input sequences.
         """
         super().__init__()
-        self.register_buffer('pe', torch.zeros(1, max_len, d_model), persistent=False)
+        self.register_buffer("pe", torch.zeros(1, max_len, d_model), persistent=False)
 
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
