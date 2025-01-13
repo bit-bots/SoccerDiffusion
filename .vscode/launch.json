@@ -3,12 +3,24 @@
     {
       "type": "debugpy",
       "request": "launch",
-      "name": "Launch DDLitLab2024 import",
+      "name": "Launch Bit-Bots import",
       "program": "${workspaceFolder}/ddlitlab2024/dataset/cli/run.py",
       "args": [
         "import",
-        "rosbag",
+        "bit-bots",
         "${workspaceFolder}/input/ID_donna_2024-07-18T12_40_29_0.mcap"
+      ]
+    },
+    {
+      "type": "debugpy",
+      "request": "launch",
+      "name": "Launch B-Human import",
+      "program": "${workspaceFolder}/ddlitlab2024/dataset/cli/run.py",
+      "args": [
+        "import",
+        "b-human",
+        "${workspaceFolder}/input/b-human/2024/SharedAutonomy/2024-05-03-14-32/Joerg/Joerg_Joerg_SharedAutonomyAttacker_Projektraum__Invisibles_1stHalf_5.log"
+        // "${workspaceFolder}/input/b-human/2024/RoboCup/2024_07_19/vsNao-Devils/DasKaenguru/DasKaenguru_DasKaenguru_AttackingGoalkeeper_Default__Nao-Devils_1stHalf_2.log"
       ]
     }
   ]
