@@ -22,7 +22,9 @@
         //"${workspaceFolder}/input/b-human/2024/SharedAutonomy/2024-05-03-14-32/Joerg/Joerg_Joerg_SharedAutonomyAttacker_Projektraum__Invisibles_1stHalf_5.log",
         //"${workspaceFolder}/input/b-human/2024/RoboCup/2024_07_19/vsNao-Devils/DasKaenguru/DasKaenguru_DasKaenguru_AttackingGoalkeeper_Default__Nao-Devils_1stHalf_2.log",
         "${workspaceFolder}/input/b-human/selection/2023_RoboCup/2023-07-09/2023-07-09-13-30_HTWK-Robots/OttoVon/OttoVon_OttoVon_CompetitionWalk_RoboCup2023__HTWK-Robots_2ndHalf_6_(01).log",
-        "DummyLocation"
+        "DummyLocation",
+        "--caching",
+        "--video",
       ]
     }
   ]

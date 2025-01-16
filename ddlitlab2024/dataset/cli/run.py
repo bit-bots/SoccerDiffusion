@@ -98,7 +98,12 @@ def main():
                         )
 
                         import_strategy = BHumanImportStrategy(
-                            metadata, image_converter, game_state_converter, synced_data_converter
+                            metadata,
+                            image_converter,
+                            game_state_converter,
+                            synced_data_converter,
+                            args.caching,
+                            args.video,
                         )
 
                     case _:

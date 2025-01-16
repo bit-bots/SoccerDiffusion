@@ -73,6 +73,8 @@ class CLIArgs:
         self.import_parser.add_argument("type", type=ImportType, help="Type of import to perform")
         self.import_parser.add_argument("file", type=Path, help="File to import")
         self.import_parser.add_argument("location", type=str, help="Location of the data")
+        self.import_parser.add_argument("--caching", action="store_true", help="Enable file caching")
+        self.import_parser.add_argument("--video", action="store_true", help="Show video while importing")
 
     def parse_args(self) -> Namespace:
         return self.validate_args(self.parser.parse_args())
