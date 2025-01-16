@@ -7,6 +7,7 @@ if typing.TYPE_CHECKING:
 
 import os
 import sys
+from pathlib import Path
 
 from rich.console import Console
 
@@ -57,6 +58,8 @@ def main():
                 from ddlitlab2024.dataset.imports.model_importer import ImportMetadata, ModelImporter
 
                 import_strategy: ImportStrategy
+                import_path: Path = Path(args.file)
+                location: str = args.location
 
                 match args.type:
                     case ImportType.BIT_BOTS:
@@ -66,7 +69,7 @@ def main():
                             allow_public=True,
                             team_name="Bit-Bots",
                             robot_type="Wolfgang-OP",
-                            location="RoboCup2024",
+                            location=location,
                             simulated=False,
                         )
                         image_converter = ImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
@@ -84,8 +87,8 @@ def main():
                         metadata = ImportMetadata(
                             allow_public=False,
                             team_name="B-Human",
-                            robot_type="NaoV6",
-                            location="TODO",  # TODO
+                            robot_type="NAO6",
+                            location=location,
                             simulated=False,
                         )
                         image_converter = ImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
@@ -93,6 +96,7 @@ def main():
                         synced_data_converter = SyncedDataConverter(
                             PreviousInterpolationResampler(DEFAULT_RESAMPLE_RATE_HZ)
                         )
+
                         import_strategy = BHumanImportStrategy(
                             metadata, image_converter, game_state_converter, synced_data_converter
                         )
@@ -100,9 +104,9 @@ def main():
                     case _:
                         raise ValueError(f"Unknown import type: {args.type}")
 
-                logger.info(f"Trying to import file '{args.file}' to database...")
+                logger.info(f"Importing file '{import_path}' to database...")
                 importer = ModelImporter(db, import_strategy)
-                importer.import_to_db(args.file)
+                importer.import_to_db(import_path)
 
         sys.exit(0)
     except Exception as e:
