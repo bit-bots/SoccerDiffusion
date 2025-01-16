@@ -17,7 +17,8 @@
     "sessionmaker",
     "sqlalchemy",
     "sqlite",
-    "tobytes"
+    "tobytes",
+    "yuyv"
   ],
   "python.analysis.typeCheckingMode": "basic",
   "python.testing.pytestArgs": ["tests"],
