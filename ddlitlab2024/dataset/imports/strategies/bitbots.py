@@ -104,6 +104,17 @@ class BitBotsImportStrategy(ImportStrategy):
                         if converter:
                             self._create_models(converter, last_messages_by_topic, relative_msg_timestamp)
 
+            # timestamps = [command.stamp for command in self.model_data.joint_commands]
+            # head_pans = [command.head_pan for command in self.model_data.joint_commands]
+            # head_tilts = [command.head_tilt for command in self.model_data.joint_commands]
+
+            # head_pan_splines = CubicSpline(timestamps, head_pans, bc_type='clamped')
+            # head_tilt_splines = CubicSpline(timestamps, head_tilts, bc_type='clamped')
+
+            # for idx, t in enumerate(timestamps):
+            #     self.model_data.joint_commands[idx].head_pan = head_pan_splines(t)
+            #     self.model_data.joint_commands[idx].head_tilt = head_tilt_splines(t)
+
             return self.model_data
 
     def _initial_conversion(self, data: InputData):
@@ -123,9 +134,9 @@ class BitBotsImportStrategy(ImportStrategy):
         model_data = converter.convert_to_model(data, relative_timestamp, self.model_data.recording)
 
         # @TODO: find a better way to handle interpolation of head movements
-        for idx, command in enumerate(model_data.joint_commands):
-            command.head_pan = model_data.joint_states[idx].head_pan
-            command.head_tilt = model_data.joint_states[idx].head_tilt
+        # for idx, command in enumerate(model_data.joint_commands):
+        #     command.head_pan = model_data.joint_states[idx].head_pan
+        #     command.head_tilt = model_data.joint_states[idx].head_tilt
 
         self.model_data = self.model_data.merge(model_data)
 
