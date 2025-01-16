@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional
 
@@ -83,6 +83,11 @@ class Recording(Base):
         CheckConstraint(team_color.in_(TeamColor.values())),
         CheckConstraint("end_time >= start_time"),
     )
+
+    def duration(self) -> Optional[timedelta]:
+        if self.start_time is None or self.end_time is None:
+            return None
+        return self.end_time - self.start_time
 
 
 class Image(Base):

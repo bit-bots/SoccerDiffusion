@@ -1,8 +1,10 @@
 {
   "cSpell.words": [
     "bigendian",
+    "dateutil",
     "ddlitlab",
     "dtype",
+    "ignoretz",
     "mcap",
     "nanosec",
     "ndarray",

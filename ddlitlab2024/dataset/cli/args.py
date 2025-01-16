@@ -72,6 +72,7 @@ class CLIArgs:
         self.import_parser = subparsers.add_parser(CLICommand.IMPORT.value, help="Import data into the database")
         self.import_parser.add_argument("type", type=ImportType, help="Type of import to perform")
         self.import_parser.add_argument("file", type=Path, help="File to import")
+        self.import_parser.add_argument("location", type=str, help="Location of the data")
 
     def parse_args(self) -> Namespace:
         return self.validate_args(self.parser.parse_args())
