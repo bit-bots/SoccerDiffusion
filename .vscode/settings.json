@@ -10,6 +10,7 @@
     "ndarray",
     "ndim",
     "nullable",
+    "ollama",
     "pybh",
     "rclpy",
     "Resampler",

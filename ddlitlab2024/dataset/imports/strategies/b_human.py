@@ -1,4 +1,5 @@
 import io
+import re
 import sys
 from collections.abc import MutableMapping
 from datetime import datetime, timedelta
@@ -6,8 +7,7 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from dateutil.parser import ParserError
-from dateutil.parser import parse as dateutil_parse
+import pandas as pd
 from PIL import Image
 from pybh.logs import Array, Frame, Log, Record
 from tqdm import tqdm
@@ -31,6 +31,9 @@ USED_REPRESENTATIONS: list[str] = [
     "RobotPose",
     "StrategyStatus",
 ]
+
+GLOBAL_TIME_OFFSET: int | None
+JPEGImage_DATE_OFFSET: int | None
 
 
 class SmartRecord(MutableMapping):
@@ -100,13 +103,29 @@ class SmartFrame(MutableMapping):
         return SmartFrame(frame)
 
     def time_ms(self) -> int | None:
-        """Returns the time of the frame in milliseconds since the start of the log, if available.
+        """Returns the zero-shifted time of the frame in milliseconds.
 
-        :return: The time of the frame in milliseconds, if available.
+        :return: The zero-shifted time of the frame in milliseconds, if available
         """
+        # TODO: Shift the time using the GLOBAL_TIME_OFFSET and JPEGImage_DATE_OFFSET
         if (info := self.get("FrameInfo")) is not None and (time := info.get("time")) is not None:
-            # In B-Human logs, the time is offset by 100_000 ms
-            return time - 100_000
+            return time
+        elif (image := self.get("JPEGImage")) is not None and (timestamp := image.get("timestamp")) is not None:
+            return timestamp
+
+    def raw_time_ms_meta(self) -> list[tuple[int, str, str]]:
+        """Returns a list of raw times contained in the frame in milliseconds since the start of the log.
+        Meta data is the thread name of the frame and the representation of the frame.
+
+        :return: A list of (time, thread, representation) tuples.
+        """
+        times = []
+        for representation, record in self.items():
+            if (time := record.get("time")) is not None:
+                times.append((time, self.thread, representation))
+            if (timestamp := record.get("timestamp")) is not None:
+                times.append((timestamp, self.thread, representation))
+        return times
 
     def image(self) -> np.ndarray | None:
         """Returns the BGR image of the frame, if available.
@@ -186,9 +205,10 @@ class BHumanImportStrategy(ImportStrategy):
 
         # TODO: populate team_color and img_width_scaling, img_height_scaling
 
-        for frame in frames:
+        for i, frame in enumerate(frames):
             self._show_video(frame)
 
+        sys.exit(0)
         return self.model_data
 
     def verify_file(self, file_path: Path) -> bool:
@@ -207,44 +227,44 @@ class BHumanImportStrategy(ImportStrategy):
     def get_datetime_from_file_path(self, file_path: Path) -> datetime:
         """Extracts the datetime from the file path.
         We assume the date is part of the file path.
-        Example: */<DATE>/<GAME>/<ROBOT>/<LOG_FILE>.log
-        <DATE> can be in the formats:
-        - *
+        The following formats have been observed:
         - YYYY-MM-DD
         - YYYY_MM_DD
         - YYYY-MM-DD*
         - YYYY_MM_DD*
         - YYYY-MM-DD_HH-MM*
 
-        <GAME> can also include more detailed datetime and can be:
-        - *
-        - YYYY-MM-DD-HH-MM
-
-
         :param file_path: Path to the file
         :return: Extracted datetime
         """
-        # Extract date from <GAME> part of the file path
-        game = file_path.parent.name
-        # Cut off alphabetical characters and -_ at the end of the string
-        game = game.rstrip("abcdefghijklmnopqrstuvwxyzäöüABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜ-_")
-        try:
-            parsed = dateutil_parse(game, fuzzy=True, ignoretz=True)
-            logger.debug(f"Extracted datetime from game part of the file path: {parsed}")
-            return parsed
-        except ParserError:
-            pass
+        # Cut off left parts of the path, only 4 parts are considered
+        path = Path.joinpath(Path(), *file_path.parts[-5:-1])
 
-        # Extract date from <DATE> part of the file path
-        date = file_path.parent.parent.name
-        # Cut off alphabetical characters and -_ at the end of the string
-        date = date.rstrip("abcdefghijklmnopqrstuvwxyzäöüABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜ-_")
-        try:
-            parsed = dateutil_parse(date, fuzzy=True, ignoretz=True)
-            logger.debug(f"Extracted datetime from date part of the file path: {parsed}")
-            return parsed
-        except ParserError:
-            pass
+        pattern: str = (
+            r"20(\d{2})[-_.:\s](\d{1,2})[-_.:\s](\d{1,2})"  # Match the year, month, and day
+            r"(?:[-_.:\s]+(\d{1,2})[-_.:\s](\d{1,2}))?"  # Match the time if present, separated by one or more delimiters
+        )
+        # Find all matches in the part
+        matches = re.findall(pattern, str(path))
+
+        # Keep track of the longest match (time-inclusive if possible)
+        longest_match = None
+        for match in matches:
+            year_suffix = int(match[0]) + 2000  # Convert year to full (e.g., 23 -> 2023)
+            month = int(match[1])
+            day = int(match[2])
+            hour = int(match[3]) if match[3] else 0  # Default to 00:00 if no time is present
+            minute = int(match[4]) if match[4] else 0
+
+            # Create a datetime object for the match
+            current_datetime = datetime(year=year_suffix, month=month, day=day, hour=hour, minute=minute)
+
+            # Compare current match to the longest_match
+            if longest_match is None or (match[3] and match[4]):  # Prioritize matches with time
+                longest_match = current_datetime
+
+        if longest_match is not None:
+            return longest_match
 
         logger.error(f"Could not extract datetime from file path: {file_path}")
         sys.exit(1)
@@ -304,28 +324,47 @@ class BHumanImportStrategy(ImportStrategy):
         )
         return recording
 
-    def _extract_timeframe(self, frames: list[SmartFrame]) -> tuple[timedelta, timedelta]:
-        first_time_ms: int | None = None
-        for frame in frames:
-            if (time_ms := frame.time_ms()) is not None:
-                first_time_ms = time_ms
-                break
-        assert isinstance(first_time_ms, int), "Timestamps (ms) must be integers"
-        logger.debug(f"Timestamp offset: {first_time_ms} [ms]")
-
-        last_time_ms: int | None = None
-        for frame in reversed(frames):
-            if (time_ms := frame.time_ms()) is not None:
-                last_time_ms = time_ms
-                break
-        assert isinstance(last_time_ms, int), "Timestamps (ms) must be integers"
-
-        assert first_time_ms <= last_time_ms, "First timestamp must be before last timestamp"
-
-        return timedelta(milliseconds=first_time_ms), timedelta(milliseconds=last_time_ms)
-
     def _populate_timestamps(self, frames: list[SmartFrame]) -> None:
-        first_timestamp, last_timestamp = self._extract_timeframe(frames)
+        times: list[tuple[int, int, str, str]] = []  # Frame index, time, thread, representation
+        for i, frame in enumerate(frames):
+            for time, thread, representation in frame.raw_time_ms_meta():
+                times.append((i, time, thread, representation))
+        df_times = pd.DataFrame(times, columns=["Frame Index", "Time [ms]", "Thread", "Representation"])
+
+        # Timestamps of JPEGImage frames are offset to everything else by about 25 days.
+        # Therefore, we need to subtract the offset from the timestamps of JPEGImage frames.
+        # We assume that the offset is constant for all JPEGImage frames.
+        # We calculate the offset by taking the average time of all JPEGImage frames and
+        # subtracting the average time of all frames.
+        avg_times = df_times.groupby("Representation")["Time [ms]"].mean().reset_index()
+        JPEGImage_DATE_OFFSET = int(
+            avg_times[avg_times["Representation"] == "JPEGImage"]["Time [ms]"].values[0]
+            - avg_times[avg_times["Representation"] != "JPEGImage"]["Time [ms]"].mean()
+        )
+
+        # Cast the "Time [ms]" column to float to prevent incompatible dtypes warning
+        df_times["Time [ms]"] = df_times["Time [ms]"]
+
+        # Subtract the offset from the timestamps of JPEGImage frames
+        df_times.loc[df_times["Representation"] == "JPEGImage", "Time [ms]"] -= JPEGImage_DATE_OFFSET
+
+        # # Plot the time of each frame, x-axis is the frame index, y-axis is the time
+        # import matplotlib.pyplot as plt
+        # fig, ax = plt.subplots()
+        # for (thread, representation), group in df_times.groupby(["Thread", "Representation"]):
+        #     ax.scatter(group["Frame Index"], group["Time [ms]"], label=f"{thread} - {representation}")
+        # ax.set_xlabel("Frame Index")
+        # ax.set_ylabel("Time [ms]")
+        # ax.legend()
+        # plt.show()
+
+        # Shift all timestamps to start at 0 ms
+        # Get the minimum timestamp of all frames and subtract it from all timestamps
+        GLOBAL_TIME_OFFSET = int(df_times["Time [ms]"].min())
+        df_times["Time [ms]"] -= GLOBAL_TIME_OFFSET
+
+        first_timestamp: timedelta = timedelta(milliseconds=df_times["Time [ms]"].min())
+        last_timestamp: timedelta = timedelta(milliseconds=df_times["Time [ms]"].max())
 
         assert self.datetime is not None, "Datetime must be defined to populate timestamps"
         start_time: datetime = self.datetime + first_timestamp

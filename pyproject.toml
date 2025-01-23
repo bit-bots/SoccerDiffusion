@@ -30,8 +30,6 @@ mcap-ros2-support = "^0.5.5"
 opencv-python = "^4.10.0.84"
 profilehooks = "^1.13.0"
 tabulate = "^0.9.0"
-pybh = {git = "https://github.com/bhuman/BHumanCodeRelease.git", rev = "master", subdirectory = "Make/Python"}
-python-dateutil = "^2.9.0.post0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.8.0"
@@ -40,6 +38,8 @@ ruff = "^0.8.0"
 pytest = "^8.3.3"
 lark = "^1.2.2"
 
+[tool.poetry.group.b_human.dependencies]
+pybh = {git = "https://github.com/bhuman/BHumanCodeRelease.git", rev = "master", subdirectory = "Make/Python"}
 
 [tool.ruff]
 fix = true
