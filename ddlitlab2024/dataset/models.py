@@ -163,8 +163,12 @@ class JointStates(Base):
     l_shoulder_pitch: Mapped[float] = mapped_column(Float, name="LShoulderPitch")
     r_shoulder_roll: Mapped[float] = mapped_column(Float, name="RShoulderRoll")
     l_shoulder_roll: Mapped[float] = mapped_column(Float, name="LShoulderRoll")
+    # The Wolfgang-OP only has a single elbow joint, which is why they are just called elbow
+    # while the Nao has two elbow joints (r_elbow thus represents RElbowRoll)
     r_elbow: Mapped[float] = mapped_column(Float, name="RElbow")
+    r_elbow_yaw: Mapped[float] = mapped_column(Float, name="RElbowYaw", default=0.0)
     l_elbow: Mapped[float] = mapped_column(Float, name="LElbow")
+    l_elbow_yaw: Mapped[float] = mapped_column(Float, name="LElbowYaw", default=0.0)
     r_hip_yaw: Mapped[float] = mapped_column(Float, name="RHipYaw")
     l_hip_yaw: Mapped[float] = mapped_column(Float, name="LHipYaw")
     r_hip_roll: Mapped[float] = mapped_column(Float, name="RHipRoll")
@@ -189,7 +193,9 @@ class JointStates(Base):
         CheckConstraint("RShoulderRoll >= 0 AND RShoulderRoll < 2 * pi()", name="RShoulderRoll_value"),
         CheckConstraint("LShoulderRoll >= 0 AND LShoulderRoll < 2 * pi()", name="LShoulderRoll_value"),
         CheckConstraint("RElbow >= 0 AND RElbow < 2 * pi()", name="RElbow_value"),
+        CheckConstraint("RElbowYaw >= 0 AND RElbowYaw < 2 * pi()", name="RElbowYaw_value"),
         CheckConstraint("LElbow >= 0 AND LElbow < 2 * pi()", name="LElbow_value"),
+        CheckConstraint("LElbowYaw >= 0 AND LElbowYaw < 2 * pi()", name="LElbowYaw_value"),
         CheckConstraint("RHipYaw >= 0 AND RHipYaw < 2 * pi()", name="RHipYaw_value"),
         CheckConstraint("LHipYaw >= 0 AND LHipYaw < 2 * pi()", name="LHipYaw_value"),
         CheckConstraint("RHipRoll >= 0 AND RHipRoll < 2 * pi()", name="RHipRoll_value"),
@@ -219,8 +225,12 @@ class JointCommands(Base):
     l_shoulder_pitch: Mapped[float] = mapped_column(Float, name="LShoulderPitch")
     r_shoulder_roll: Mapped[float] = mapped_column(Float, name="RShoulderRoll")
     l_shoulder_roll: Mapped[float] = mapped_column(Float, name="LShoulderRoll")
+    # The Wolfgang-OP only has a single elbow joint, which is why they are just called elbow
+    # while the Nao has two elbow joints (r_elbow thus represents RElbowRoll)
     r_elbow: Mapped[float] = mapped_column(Float, name="RElbow")
+    r_elbow_yaw: Mapped[float] = mapped_column(Float, name="RElbowYaw", default=0.0)
     l_elbow: Mapped[float] = mapped_column(Float, name="LElbow")
+    l_elbow_yaw: Mapped[float] = mapped_column(Float, name="LElbowYaw", default=0.0)
     r_hip_yaw: Mapped[float] = mapped_column(Float, name="RHipYaw")
     l_hip_yaw: Mapped[float] = mapped_column(Float, name="LHipYaw")
     r_hip_roll: Mapped[float] = mapped_column(Float, name="RHipRoll")
@@ -245,7 +255,9 @@ class JointCommands(Base):
         CheckConstraint("RShoulderRoll >= 0 AND RShoulderRoll < 2 * pi()", name="RShoulderRoll_value"),
         CheckConstraint("LShoulderRoll >= 0 AND LShoulderRoll < 2 * pi()", name="LShoulderRoll_value"),
         CheckConstraint("RElbow >= 0 AND RElbow < 2 * pi()", name="RElbow_value"),
+        CheckConstraint("RElbowYaw >= 0 AND RElbowYaw < 2 * pi()", name="RElbowYaw_value"),
         CheckConstraint("LElbow >= 0 AND LElbow < 2 * pi()", name="LElbow_value"),
+        CheckConstraint("LElbowYaw >= 0 AND LElbowYaw < 2 * pi()", name="LElbowYaw_value"),
         CheckConstraint("RHipYaw >= 0 AND RHipYaw < 2 * pi()", name="RHipYaw_value"),
         CheckConstraint("LHipYaw >= 0 AND LHipYaw < 2 * pi()", name="LHipYaw_value"),
         CheckConstraint("RHipRoll >= 0 AND RHipRoll < 2 * pi()", name="RHipRoll_value"),
