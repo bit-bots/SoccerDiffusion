@@ -1,9 +1,8 @@
 import argparse
-import os
-import sys
+
 import torch
-from ema_pytorch import EMA
 import yaml
+from ema_pytorch import EMA
 
 from ddlitlab2024.ml.model import End2EndDiffusionTransformer
 from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType
@@ -12,7 +11,6 @@ from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 # This script embeds the parameters into the model itself
 
 if __name__ == "__main__":
-
     # Get command line arguments
     parser = argparse.ArgumentParser(description="Convert a legacy checkpoint to the new format")
     parser.add_argument("checkpoint", type=str, help="Path to the checkpoint to load")
@@ -21,7 +19,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load the hyperparameters from training yaml file
-    with open(args.config, "r") as file:
+    with open(args.config) as file:
         params = yaml.safe_load(file)
 
     # Initialize the Transformer model and optimizer, and move model to device
@@ -32,7 +30,9 @@ if __name__ == "__main__":
         num_action_history_encoder_layers=params["num_action_history_encoder_layers"],
         max_action_context_length=params["action_context_length"],
         use_imu=params["use_imu"],
-        imu_orientation_embedding_method=IMUEncoder.OrientationEmbeddingMethod(params["imu_orientation_embedding_method"]),
+        imu_orientation_embedding_method=IMUEncoder.OrientationEmbeddingMethod(
+            params["imu_orientation_embedding_method"]
+        ),
         num_imu_encoder_layers=params["num_imu_encoder_layers"],
         imu_context_length=params["imu_context_length"],
         use_joint_states=params["use_joint_states"],
