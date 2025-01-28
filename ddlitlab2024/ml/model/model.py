@@ -5,6 +5,7 @@ from ddlitlab2024.ml.model.decoder import DiffusionActionGenerator
 from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType, image_sequence_encoder_factory
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 from ddlitlab2024.ml.model.encoder.joint import JointEncoder
+from ddlitlab2024.ml.model.encoder.game_state import GameStateEncoder
 from ddlitlab2024.ml.model.misc import StepToken
 
 
@@ -28,7 +29,7 @@ class End2EndDiffusionTransformer(nn.Module):
         image_sequence_encoder_type: SequenceEncoderType,
         num_image_sequence_encoder_layers: int,
         max_image_context_length: int,
-        num_decoder_layers: int = 4,
+        use_gamestate: bool,
         trajectory_prediction_length: int = 8,
     ):
         super().__init__()
@@ -90,13 +91,16 @@ class End2EndDiffusionTransformer(nn.Module):
             else None
         )
 
+        # Gamestate encoder
+        self.game_state_encoder = (
+            GameStateEncoder(hidden_dim) if use_gamestate else None
+        )
+
         # Define the decoder model for the diffusion denoising process
         self.diffusion_action_generator = DiffusionActionGenerator(
             num_joints=num_joints,
             hidden_dim=hidden_dim,
-            num_layers=num_decoder_layers,
-            num_heads=4,
-            max_seq_len=trajectory_prediction_length,
+            seq_len=trajectory_prediction_length,
         )
 
         # Store normalization parameters
@@ -123,8 +127,10 @@ class End2EndDiffusionTransformer(nn.Module):
             context.append(self.joint_states_encoder(input_data["joint_state"]))
         if self.image_sequence_encoder is not None:
             context.append(self.image_sequence_encoder(input_data["image_data"]))
+        if self.game_state_encoder is not None:
+            context.append(self.game_state_encoder(input_data["game_state"]))
 
-        # TODO utilize gamestate and image time stamps
+        # TODO utilize image time stamps
 
         return context
 
@@ -154,7 +160,7 @@ class End2EndDiffusionTransformer(nn.Module):
         step_token = self.step_encoding(step)
 
         # Concatenate the context
-        context_tensor = torch.cat(context + [step_token], dim=1)
+        context_tensor = torch.cat(context + [step_token], dim=1).mean(dim=1)
 
         # Denoise the noisy action predictions
         return self.diffusion_action_generator(noisy_action_predictions, context_tensor)

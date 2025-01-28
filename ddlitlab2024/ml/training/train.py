@@ -90,7 +90,7 @@ if __name__ == "__main__":
         image_encoder_type=ImageEncoderType.RESNET18,
         num_image_sequence_encoder_layers=1,
         max_image_context_length=image_context_length,
-        num_decoder_layers=4,
+        use_gamestate=True,
         trajectory_prediction_length=trajectory_prediction_length,
     ).to(device)
 
