@@ -45,6 +45,7 @@ if __name__ == "__main__":
         use_action_history=True,
         num_action_history_encoder_layers=2,
         max_action_context_length=action_context_length,
+        encoder_patch_size=10,
         use_imu=True,
         imu_orientation_embedding_method=IMUEncoder.OrientationEmbeddingMethod.QUATERNION,
         num_imu_encoder_layers=2,

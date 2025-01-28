@@ -17,6 +17,7 @@ class End2EndDiffusionTransformer(nn.Module):
         use_action_history: bool,
         num_action_history_encoder_layers: int,
         max_action_context_length: int,
+        encoder_patch_size: int,
         use_imu: bool,
         imu_orientation_embedding_method: IMUEncoder.OrientationEmbeddingMethod,
         num_imu_encoder_layers: int,
@@ -43,6 +44,7 @@ class End2EndDiffusionTransformer(nn.Module):
         self.action_history_encoder = (
             JointEncoder(
                 num_joints=num_joints,
+                patch_size=encoder_patch_size,
                 hidden_dim=hidden_dim,
                 num_layers=num_action_history_encoder_layers,
                 num_heads=4,
@@ -56,6 +58,7 @@ class End2EndDiffusionTransformer(nn.Module):
         self.imu_encoder = (
             IMUEncoder(
                 orientation_embedding_method=imu_orientation_embedding_method,
+                patch_size=encoder_patch_size,
                 hidden_dim=hidden_dim,
                 num_layers=num_imu_encoder_layers,
                 num_heads=4,
@@ -69,6 +72,7 @@ class End2EndDiffusionTransformer(nn.Module):
         self.joint_states_encoder = (
             JointEncoder(
                 num_joints=num_joints,
+                patch_size=encoder_patch_size,
                 hidden_dim=hidden_dim,
                 num_layers=joint_state_encoder_layers,
                 num_heads=4,
