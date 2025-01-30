@@ -23,8 +23,8 @@ from sensor_msgs.msg import Image, JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from ddlitlab2024 import DEFAULT_RESAMPLE_RATE_HZ
-from ddlitlab2024.dataset.pytorch import Normalizer
 from ddlitlab2024.dataset.models import JointStates
+from ddlitlab2024.dataset.pytorch import Normalizer
 from ddlitlab2024.ml.model import End2EndDiffusionTransformer
 from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
@@ -91,7 +91,9 @@ class Inference(Node):
         # Add default values to the buffers
         self.image_embeddings = [torch.randn(3, 480, 480)] * self.image_context_length
         self.imu_data = [torch.randn(4)] * self.imu_context_length
-        self.joint_state_data = [torch.randn(len(JointStates.get_ordered_joint_names()))] * self.joint_state_context_length
+        self.joint_state_data = [
+            torch.randn(len(JointStates.get_ordered_joint_names()))
+        ] * self.joint_state_context_length
         self.joint_command_data = [torch.randn(self.num_joints)] * self.action_context_length
 
         self.data_lock = Lock()

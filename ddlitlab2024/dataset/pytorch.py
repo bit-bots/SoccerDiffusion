@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from ddlitlab2024 import DB_PATH
 from ddlitlab2024.dataset import logger
-from ddlitlab2024.dataset.models import RobotState, JointStates
+from ddlitlab2024.dataset.models import JointStates, RobotState
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 from ddlitlab2024.utils.utils import quats_to_5d
 
