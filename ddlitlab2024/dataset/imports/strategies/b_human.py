@@ -3,6 +3,7 @@ import re
 import sys
 from collections.abc import MutableMapping
 from datetime import datetime, timedelta
+from enum import Enum
 from pathlib import Path
 from typing import TypeAlias, TypeVar
 
@@ -14,30 +15,47 @@ from pybh.logs import Array, Frame, Log, Record, Value
 from tqdm import tqdm
 
 from ddlitlab2024.dataset import logger
+from ddlitlab2024.dataset.converters.converter import Converter
 from ddlitlab2024.dataset.converters.game_state_converter import GameStateConverter
 from ddlitlab2024.dataset.converters.image_converter import ImageConverter
 from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConverter
-from ddlitlab2024.dataset.imports.data import ModelData
+from ddlitlab2024.dataset.imports.data import InputData, ModelData
 from ddlitlab2024.dataset.imports.model_importer import ImportMetadata, ImportStrategy
 from ddlitlab2024.dataset.models import DEFAULT_IMG_SIZE, Recording
 
-USED_REPRESENTATIONS: list[str] = [
-    "FrameInfo",
-    "GameControlData",
-    "GameState",
-    "InertialSensorData",
-    "JointSensorData",
-    "JPEGImage",
-    "MotionRequest",
-    "RobotPose",
-    "StrategyStatus",
-]
+
+class Representation(str, Enum):
+    FRAME_INFO = "FrameInfo"
+    GAME_CONTROL_DATA = "GameControlData"
+    GAME_STATE = "GameState"
+    INERTIAL_SENSOR_DATA = "InertialSensorData"
+    JOINT_SENSOR_DATA = "JointSensorData"
+    JPEG_IMAGE = "JPEGImage"
+    MOTION_REQUEST = "MotionRequest"
+    ROBOT_POSE = "RobotPose"
+    STRATEGY_STATUS = "StrategyStatus"
+
+    @classmethod
+    def values(cls) -> list[str]:
+        return list(map(lambda c: c.value, cls))
+
+
+class Thread(str, Enum):
+    Upper = "Upper"
+    Lower = "Lower"
+
 
 global GLOBAL_TIME_OFFSET
 global JPEG_IMAGE_DATE_OFFSET
 
 GLOBAL_TIME_OFFSET: int | None = None
 JPEG_IMAGE_DATE_OFFSET: int | None = None
+
+global UPPER_IMAGE_RESOLUTION
+global LOWER_IMAGE_RESOLUTION
+
+UPPER_IMAGE_RESOLUTION: tuple[int, int] | None = None
+LOWER_IMAGE_RESOLUTION: tuple[int, int] | None = None
 
 SmartValue: TypeAlias = bool | int | float | str | bytes | list | dict | Value
 
@@ -87,7 +105,7 @@ class SmartRecord(MutableMapping):
 class SmartFrame(MutableMapping):
     def __init__(self, frame: Frame):
         self.data: dict[str, SmartRecord] = {
-            repr: SmartRecord(frame[repr]) for repr in frame.representations if repr in USED_REPRESENTATIONS
+            repr: SmartRecord(frame[repr]) for repr in frame.representations if repr in Representation.values()
         }
         self.thread: str = frame.thread
 
@@ -122,7 +140,9 @@ class SmartFrame(MutableMapping):
 
         # Case JPEGImage timestamp is available
         # Shift the time using the GLOBAL_TIME_OFFSET and JPEGImage_DATE_OFFSET if they are defined
-        if (image := self.get("JPEGImage")) is not None and isinstance((timestamp := image.get("timestamp")), int):
+        if (image := self.get(Representation.JPEG_IMAGE.value)) is not None and isinstance(
+            (timestamp := image.get("timestamp")), int
+        ):
             if GLOBAL_TIME_OFFSET is not None and JPEG_IMAGE_DATE_OFFSET is not None:
                 return timestamp - GLOBAL_TIME_OFFSET - JPEG_IMAGE_DATE_OFFSET
 
@@ -151,24 +171,25 @@ class SmartFrame(MutableMapping):
 
     def image(self) -> np.ndarray | None:
         """Returns the BGR image of the frame, if available.
+        An lower camera image is resized to the upper camera resolution, if sizes are known.
 
         :return: The BGR image of the frame, if available.
         """
-        if (jpeg_image := self.get("JPEGImage")) is not None:
+        if (jpeg_image := self.get(Representation.JPEG_IMAGE.value)) is not None:
             timestamp: int = jpeg_image.get("timestamp")  # type: ignore
-            assert timestamp is not None, "Timestamp must be defined for JPEGImage"
+            assert timestamp is not None, f"Timestamp must be defined for {Representation.JPEG_IMAGE.value}"
 
             size: int = jpeg_image.get("size")  # type: ignore
-            assert size is not None, "Size must be defined for JPEGImage"
+            assert size is not None, f"Size must be defined for {Representation.JPEG_IMAGE.value}"
 
             height: int = jpeg_image.get("height")  # type: ignore
-            assert height is not None, "Height must be defined for JPEGImage"
+            assert height is not None, f"Height must be defined for {Representation.JPEG_IMAGE.value}"
 
             width: int = jpeg_image.get("width")  # type: ignore
-            assert width is not None, "Width must be defined for JPEGImage"
+            assert width is not None, f"Width must be defined for {Representation.JPEG_IMAGE.value}"
 
             data: bytes = jpeg_image.get("_data")  # type: ignore
-            assert data is not None, "Data must be defined for JPEGImage"
+            assert data is not None, f"Data must be defined for {Representation.JPEG_IMAGE.value}"
             data = data[-size:]
 
             # Load YUYV data
@@ -193,6 +214,12 @@ class SmartFrame(MutableMapping):
 
             # Convert YUV to BGR
             img_bgr = 255 - cv2.cvtColor(img_yuv, cv2.COLOR_YUV2BGR)
+
+            # Resize lower camera image to upper camera resolution
+            if self.thread == Thread.Lower.value:
+                global UPPER_IMAGE_RESOLUTION, LOWER_IMAGE_RESOLUTION
+                if UPPER_IMAGE_RESOLUTION is not None and LOWER_IMAGE_RESOLUTION is not None:
+                    img_bgr = cv2.resize(img_bgr, UPPER_IMAGE_RESOLUTION)
             return img_bgr
 
 
@@ -200,14 +227,16 @@ class BHumanImportStrategy(ImportStrategy):
     def __init__(
         self,
         metadata: ImportMetadata,
-        image_converter: ImageConverter,
+        upper_image_converter: ImageConverter,
+        lower_image_converter: ImageConverter,
         game_state_converter: GameStateConverter,
         synced_data_converter: SyncedDataConverter,
         caching: bool = False,
         video: bool = False,
     ):
         self.metadata = metadata
-        self.image_converter = image_converter
+        self.upper_image_converter = upper_image_converter
+        self.lower_image_converter = lower_image_converter
         self.game_state_converter = game_state_converter
         self.synced_data_converter = synced_data_converter
         self.caching = caching
@@ -223,24 +252,64 @@ class BHumanImportStrategy(ImportStrategy):
 
         self.model_data.recording = self._create_recording(file_path)
         log, frames = self._read_log_file(file_path)
-        frames = self.handle_timestamps(frames)
+        frames = self._handle_timestamps(frames)
+        self._extract_image_resolutions(frames)
 
-        # TODO: populate team_color and img_width_scaling, img_height_scaling
+        data = InputData()
 
-        # # Scatter plot the time of sorted frames
-        # import matplotlib.pyplot as plt
+        # TODO: populate team_color
 
-        # times = [frame.time_ms() for frame in frames]
-        # plt.scatter(range(len(times)), times)  # type: ignore
-        # plt.xlabel("Frame Index")
-        # plt.ylabel("Time [ms]")
-        # plt.title("Time of Sorted Frames")
-        # plt.show()
-
-        for i, frame in enumerate(frames):
+        for i, frame in tqdm(enumerate(frames), total=len(frames), desc="Converting frames", unit="frames"):
             self._show_video(frame)
 
-        sys.exit(0)
+            converter: Converter | None = None
+
+            time = frame.time_ms()
+            if time is None:
+                continue
+            relative_timestamp = time / 1000.0
+
+            for representation, record in frame.items():
+                match representation:
+                    case Representation.FRAME_INFO.value:
+                        pass
+                    case Representation.GAME_CONTROL_DATA.value:
+                        pass
+                    case Representation.GAME_STATE.value:
+                        pass
+                    case Representation.INERTIAL_SENSOR_DATA.value:
+                        pass
+                    case Representation.JOINT_SENSOR_DATA.value:
+                        pass
+                    case Representation.JPEG_IMAGE.value:
+                        thread = frame.thread
+                        image = frame.image()
+                        if image is not None:
+                            match thread:
+                                case Thread.Upper.value:
+                                    data.image = image
+                                    converter = self.upper_image_converter
+                                case Thread.Lower.value:
+                                    data.lower_image = image
+                                    converter = self.lower_image_converter
+                                case _:
+                                    logger.error(f"Unknown image thread: {thread}")
+                                    continue
+                    case Representation.MOTION_REQUEST.value:
+                        pass
+                    case Representation.ROBOT_POSE.value:
+                        pass
+                    case Representation.STRATEGY_STATUS.value:
+                        pass
+                    case _:
+                        logger.error(f"Unknown representation: {representation}")
+
+            if converter is not None:
+                assert self.model_data.recording is not None, "Recording must be defined to create child models"
+                converter.populate_recording_metadata(data, self.model_data.recording)
+                model_data = converter.convert_to_model(data, relative_timestamp, self.model_data.recording)
+                self.model_data = self.model_data.merge(model_data)
+
         return self.model_data
 
     def verify_file(self, file_path: Path) -> bool:
@@ -356,7 +425,7 @@ class BHumanImportStrategy(ImportStrategy):
         )
         return recording
 
-    def handle_timestamps(self, frames: list[SmartFrame]) -> list[SmartFrame]:
+    def _handle_timestamps(self, frames: list[SmartFrame]) -> list[SmartFrame]:
         """Shifts the timestamps of the frames to start at 0 ms and populates the recording start and end times.
 
         :param frames: List of frames
@@ -378,12 +447,14 @@ class BHumanImportStrategy(ImportStrategy):
         # subtracting the average time of all frames.
         avg_times = df_times.groupby("Representation")["Time [ms]"].mean().reset_index()
         JPEG_IMAGE_DATE_OFFSET = int(
-            avg_times[avg_times["Representation"] == "JPEGImage"]["Time [ms]"].values[0]
-            - avg_times[avg_times["Representation"] != "JPEGImage"]["Time [ms]"].mean()
+            avg_times[avg_times["Representation"] == Representation.JPEG_IMAGE.value]["Time [ms]"].values[0]
+            - avg_times[avg_times["Representation"] != Representation.JPEG_IMAGE.value]["Time [ms]"].mean()
         )
 
         # Subtract the offset from the timestamps of JPEGImage frames
-        df_times.loc[df_times["Representation"] == "JPEGImage", "Time [ms]"] -= JPEG_IMAGE_DATE_OFFSET
+        df_times.loc[df_times["Representation"] == Representation.JPEG_IMAGE.value, "Time [ms]"] -= (
+            JPEG_IMAGE_DATE_OFFSET
+        )
 
         # Shift all timestamps to start at 0 ms
         # Get the minimum timestamp of all frames and subtract it from all timestamps
@@ -408,9 +479,36 @@ class BHumanImportStrategy(ImportStrategy):
         )
 
         # Drop frames with time_ms() == None and sort frames by time_ms() in ascending order
+        # TODO: Handle dropped frames and regenerate time somehow
         frames = [frame for frame in frames if frame.time_ms() is not None]
         frames.sort(key=lambda frame: frame.time_ms())  # type: ignore
+
+        # # Scatter plot the time of sorted frames
+        # import matplotlib.pyplot as plt
+
+        # times = [frame.time_ms() for frame in frames]
+        # plt.scatter(range(len(times)), times)  # type: ignore
+        # plt.xlabel("Frame Index")
+        # plt.ylabel("Time [ms]")
+        # plt.title("Time of Sorted Frames")
+        # plt.show()
         return frames
+
+    def _extract_image_resolutions(self, frames: list[SmartFrame]) -> None:
+        global UPPER_IMAGE_RESOLUTION, LOWER_IMAGE_RESOLUTION
+
+        for frame in frames:
+            if UPPER_IMAGE_RESOLUTION is not None and LOWER_IMAGE_RESOLUTION is not None:
+                return
+
+            thread = frame.thread
+            image = frame.image()
+
+            if image is not None:
+                if thread == Thread.Upper.value and UPPER_IMAGE_RESOLUTION is None:
+                    UPPER_IMAGE_RESOLUTION = (image.shape[1], image.shape[0])
+                elif thread == Thread.Lower.value and LOWER_IMAGE_RESOLUTION is None:
+                    LOWER_IMAGE_RESOLUTION = (image.shape[1], image.shape[0])
 
     def _show_video(self, frame: SmartFrame) -> None:
         if self.video and (img := frame.image()) is not None:

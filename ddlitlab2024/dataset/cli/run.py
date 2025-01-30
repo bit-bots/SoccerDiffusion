@@ -15,7 +15,7 @@ from ddlitlab2024 import DEFAULT_RESAMPLE_RATE_HZ, IMAGE_MAX_RESAMPLE_RATE_HZ, _
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.cli.args import CLIArgs, CLICommand, DBCommand, ImportType
 from ddlitlab2024.dataset.converters.game_state_converter import GameStateConverter
-from ddlitlab2024.dataset.converters.image_converter import ImageConverter
+from ddlitlab2024.dataset.converters.image_converter import BHumanImageConverter, BitbotsImageConverter, ImageConverter
 from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConverter
 from ddlitlab2024.dataset.db import Database
 from ddlitlab2024.dataset.imports.model_importer import ImportStrategy
@@ -59,6 +59,7 @@ def main():
 
                 import_strategy: ImportStrategy
                 import_path: Path = Path(args.file)
+                upper_image_converter: ImageConverter
                 location: str = args.location
 
                 match args.type:
@@ -72,13 +73,13 @@ def main():
                             location=location,
                             simulated=False,
                         )
-                        image_converter = ImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
+                        upper_image_converter = BitbotsImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
                         game_state_converter = GameStateConverter(OriginalRateResampler())
                         synced_data_converter = SyncedDataConverter(
                             PreviousInterpolationResampler(DEFAULT_RESAMPLE_RATE_HZ)
                         )
                         import_strategy = BitBotsImportStrategy(
-                            metadata, image_converter, game_state_converter, synced_data_converter
+                            metadata, upper_image_converter, game_state_converter, synced_data_converter
                         )
 
                     case ImportType.B_HUMAN:
@@ -91,7 +92,8 @@ def main():
                             location=location,
                             simulated=False,
                         )
-                        image_converter = ImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
+                        upper_image_converter = BHumanImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
+                        lower_image_converter = BHumanImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
                         game_state_converter = GameStateConverter(OriginalRateResampler())
                         synced_data_converter = SyncedDataConverter(
                             PreviousInterpolationResampler(DEFAULT_RESAMPLE_RATE_HZ)
@@ -99,7 +101,8 @@ def main():
 
                         import_strategy = BHumanImportStrategy(
                             metadata,
-                            image_converter,
+                            upper_image_converter,
+                            lower_image_converter,
                             game_state_converter,
                             synced_data_converter,
                             args.caching,
