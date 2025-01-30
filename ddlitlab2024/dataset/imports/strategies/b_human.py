@@ -4,12 +4,13 @@ import sys
 from collections.abc import MutableMapping
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import TypeAlias, TypeVar
 
 import cv2
 import numpy as np
 import pandas as pd
 from PIL import Image
-from pybh.logs import Array, Frame, Log, Record
+from pybh.logs import Array, Frame, Log, Record, Value
 from tqdm import tqdm
 
 from ddlitlab2024.dataset import logger
@@ -32,18 +33,23 @@ USED_REPRESENTATIONS: list[str] = [
     "StrategyStatus",
 ]
 
-GLOBAL_TIME_OFFSET: int | None
-JPEGImage_DATE_OFFSET: int | None
+global GLOBAL_TIME_OFFSET
+global JPEG_IMAGE_DATE_OFFSET
+
+GLOBAL_TIME_OFFSET: int | None = None
+JPEG_IMAGE_DATE_OFFSET: int | None = None
+
+SmartValue: TypeAlias = bool | int | float | str | bytes | list | dict | Value
 
 
 class SmartRecord(MutableMapping):
-    def __init__(self, record) -> None:
-        self.data = {}
+    def __init__(self, record: Record) -> None:
+        self.data: dict[str, SmartValue] = {}
         for key in record:
             value = record.__getattr__(key)
             match value:
                 case Record():
-                    self.data[key] = SmartRecord(value)
+                    self.data[key] = SmartRecord(value).data
                 case Array():
                     array_values = []
                     for array_value in value:
@@ -56,46 +62,51 @@ class SmartRecord(MutableMapping):
                 case _:
                     self.data[key] = value
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> SmartValue:
         return self.data[key]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: SmartValue) -> None:
         self.data[key] = value
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: str) -> None:
         del self.data[key]
 
     def __iter__(self):
         return iter(self.data)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data)
 
-    def get(self, key, default=None):
+    # Typedef for default value in get method
+    D = TypeVar("D")
+
+    def get(self, key: str, default: D = None) -> SmartValue | D:
         return self.data.get(key, default)
 
 
 class SmartFrame(MutableMapping):
     def __init__(self, frame: Frame):
-        self.data = {repr: SmartRecord(frame[repr]) for repr in frame.representations if repr in USED_REPRESENTATIONS}
+        self.data: dict[str, SmartRecord] = {
+            repr: SmartRecord(frame[repr]) for repr in frame.representations if repr in USED_REPRESENTATIONS
+        }
         self.thread: str = frame.thread
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> SmartRecord:
         return self.data[key]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: SmartRecord) -> None:
         self.data[key] = value
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: str) -> None:
         del self.data[key]
 
     def __iter__(self):
         return iter(self.data)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.data)
 
-    def get(self, key, default=None):
+    def get(self, key, default=None) -> SmartRecord | None:
         return self.data.get(key, default)
 
     @staticmethod
@@ -107,11 +118,22 @@ class SmartFrame(MutableMapping):
 
         :return: The zero-shifted time of the frame in milliseconds, if available
         """
-        # TODO: Shift the time using the GLOBAL_TIME_OFFSET and JPEGImage_DATE_OFFSET
-        if (info := self.get("FrameInfo")) is not None and (time := info.get("time")) is not None:
-            return time
-        elif (image := self.get("JPEGImage")) is not None and (timestamp := image.get("timestamp")) is not None:
-            return timestamp
+        global GLOBAL_TIME_OFFSET, JPEG_IMAGE_DATE_OFFSET
+
+        # Case JPEGImage timestamp is available
+        # Shift the time using the GLOBAL_TIME_OFFSET and JPEGImage_DATE_OFFSET if they are defined
+        if (image := self.get("JPEGImage")) is not None and isinstance((timestamp := image.get("timestamp")), int):
+            if GLOBAL_TIME_OFFSET is not None and JPEG_IMAGE_DATE_OFFSET is not None:
+                return timestamp - GLOBAL_TIME_OFFSET - JPEG_IMAGE_DATE_OFFSET
+
+        # Case other timestamp is available
+        # Shift the time using the GLOBAL_TIME_OFFSET if it is defined
+        if isinstance((time := self.get("time")), int):
+            if GLOBAL_TIME_OFFSET is not None:
+                return time - GLOBAL_TIME_OFFSET
+
+        # If no time is available, return None
+        return None
 
     def raw_time_ms_meta(self) -> list[tuple[int, str, str]]:
         """Returns a list of raw times contained in the frame in milliseconds since the start of the log.
@@ -133,19 +155,19 @@ class SmartFrame(MutableMapping):
         :return: The BGR image of the frame, if available.
         """
         if (jpeg_image := self.get("JPEGImage")) is not None:
-            timestamp = jpeg_image.get("timestamp")
+            timestamp: int = jpeg_image.get("timestamp")  # type: ignore
             assert timestamp is not None, "Timestamp must be defined for JPEGImage"
 
-            size = jpeg_image.get("size")
+            size: int = jpeg_image.get("size")  # type: ignore
             assert size is not None, "Size must be defined for JPEGImage"
 
-            height = jpeg_image.get("height")
+            height: int = jpeg_image.get("height")  # type: ignore
             assert height is not None, "Height must be defined for JPEGImage"
 
-            width = jpeg_image.get("width")
+            width: int = jpeg_image.get("width")  # type: ignore
             assert width is not None, "Width must be defined for JPEGImage"
 
-            data = jpeg_image.get("_data")
+            data: bytes = jpeg_image.get("_data")  # type: ignore
             assert data is not None, "Data must be defined for JPEGImage"
             data = data[-size:]
 
@@ -201,9 +223,19 @@ class BHumanImportStrategy(ImportStrategy):
 
         self.model_data.recording = self._create_recording(file_path)
         log, frames = self._read_log_file(file_path)
-        self._populate_timestamps(frames)
+        frames = self.handle_timestamps(frames)
 
         # TODO: populate team_color and img_width_scaling, img_height_scaling
+
+        # # Scatter plot the time of sorted frames
+        # import matplotlib.pyplot as plt
+
+        # times = [frame.time_ms() for frame in frames]
+        # plt.scatter(range(len(times)), times)  # type: ignore
+        # plt.xlabel("Frame Index")
+        # plt.ylabel("Time [ms]")
+        # plt.title("Time of Sorted Frames")
+        # plt.show()
 
         for i, frame in enumerate(frames):
             self._show_video(frame)
@@ -324,7 +356,15 @@ class BHumanImportStrategy(ImportStrategy):
         )
         return recording
 
-    def _populate_timestamps(self, frames: list[SmartFrame]) -> None:
+    def handle_timestamps(self, frames: list[SmartFrame]) -> list[SmartFrame]:
+        """Shifts the timestamps of the frames to start at 0 ms and populates the recording start and end times.
+
+        :param frames: List of frames
+        :return: List of sorted frames with shifted timestamps (Drops frames without timestamps)
+        """
+
+        global GLOBAL_TIME_OFFSET, JPEG_IMAGE_DATE_OFFSET
+
         times: list[tuple[int, int, str, str]] = []  # Frame index, time, thread, representation
         for i, frame in enumerate(frames):
             for time, thread, representation in frame.raw_time_ms_meta():
@@ -337,34 +377,21 @@ class BHumanImportStrategy(ImportStrategy):
         # We calculate the offset by taking the average time of all JPEGImage frames and
         # subtracting the average time of all frames.
         avg_times = df_times.groupby("Representation")["Time [ms]"].mean().reset_index()
-        JPEGImage_DATE_OFFSET = int(
+        JPEG_IMAGE_DATE_OFFSET = int(
             avg_times[avg_times["Representation"] == "JPEGImage"]["Time [ms]"].values[0]
             - avg_times[avg_times["Representation"] != "JPEGImage"]["Time [ms]"].mean()
         )
 
-        # Cast the "Time [ms]" column to float to prevent incompatible dtypes warning
-        df_times["Time [ms]"] = df_times["Time [ms]"]
-
         # Subtract the offset from the timestamps of JPEGImage frames
-        df_times.loc[df_times["Representation"] == "JPEGImage", "Time [ms]"] -= JPEGImage_DATE_OFFSET
-
-        # # Plot the time of each frame, x-axis is the frame index, y-axis is the time
-        # import matplotlib.pyplot as plt
-        # fig, ax = plt.subplots()
-        # for (thread, representation), group in df_times.groupby(["Thread", "Representation"]):
-        #     ax.scatter(group["Frame Index"], group["Time [ms]"], label=f"{thread} - {representation}")
-        # ax.set_xlabel("Frame Index")
-        # ax.set_ylabel("Time [ms]")
-        # ax.legend()
-        # plt.show()
+        df_times.loc[df_times["Representation"] == "JPEGImage", "Time [ms]"] -= JPEG_IMAGE_DATE_OFFSET
 
         # Shift all timestamps to start at 0 ms
         # Get the minimum timestamp of all frames and subtract it from all timestamps
         GLOBAL_TIME_OFFSET = int(df_times["Time [ms]"].min())
         df_times["Time [ms]"] -= GLOBAL_TIME_OFFSET
 
-        first_timestamp: timedelta = timedelta(milliseconds=df_times["Time [ms]"].min())
-        last_timestamp: timedelta = timedelta(milliseconds=df_times["Time [ms]"].max())
+        first_timestamp: timedelta = timedelta(milliseconds=int(df_times["Time [ms]"].min()))
+        last_timestamp: timedelta = timedelta(milliseconds=int(df_times["Time [ms]"].max()))
 
         assert self.datetime is not None, "Datetime must be defined to populate timestamps"
         start_time: datetime = self.datetime + first_timestamp
@@ -379,6 +406,11 @@ class BHumanImportStrategy(ImportStrategy):
             f"Recording duration {self.model_data.recording.duration().total_seconds()} [s]"
             f" from {start_time.isoformat()}"
         )
+
+        # Drop frames with time_ms() == None and sort frames by time_ms() in ascending order
+        frames = [frame for frame in frames if frame.time_ms() is not None]
+        frames.sort(key=lambda frame: frame.time_ms())  # type: ignore
+        return frames
 
     def _show_video(self, frame: SmartFrame) -> None:
         if self.video and (img := frame.image()) is not None:
