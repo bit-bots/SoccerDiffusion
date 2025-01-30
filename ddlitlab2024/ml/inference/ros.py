@@ -52,7 +52,10 @@ class Inference(Node):
         self.imu_context_length = 100
         self.joint_state_context_length = 100
         self.num_joints = 20
-        checkpoint = "/home/florian/ddlitlab/ddlitlab_repo/ddlitlab2024/ml/training/trajectory_transformer_model_500_epoch_xmas.pth"
+        checkpoint = (
+            "/home/florian/ddlitlab/ddlitlab_repo/ddlitlab2024/ml/training/"
+            "trajectory_transformer_model_500_epoch_xmas.pth"
+        )
 
         # Subscribe to all the input topics
         self.joint_state_sub = self.create_subscription(JointState, "/joint_states", self.joint_state_callback, 10)
@@ -241,7 +244,7 @@ class Inference(Node):
         ## Perform the embedding of the conditioning
         start = time.time()
         embedded_input = self.og_model.encode_input_data(batch)
-        # print("Time for embedding: ", time.time() - start)
+        print("Time for embedding: ", time.time() - start)
 
         # Denoise the trajectory
         start = time.time()
@@ -256,7 +259,7 @@ class Inference(Node):
                 # Update the trajectory based on the predicted noise and the current step of the denoising process
                 trajectory = self.scheduler.step(noise_pred, t, trajectory).prev_sample
 
-        # print("Time for forward: ", time.time() - start)
+        print("Time for forward: ", time.time() - start)
 
         # Undo the normalization
         trajectory = self.normalizer.denormalize(trajectory)
