@@ -273,7 +273,9 @@ class Inference(Node):
             point = JointTrajectoryPoint()
             point.positions = trajectory[0, i].cpu().numpy() - np.pi
             point.time_from_start = Duration(nanoseconds=int(1e9 / self.sample_rate * i)).to_msg()
-            point.velocities = [3.0] * 2 + [-1.0] * (len(JOINT_NAMES_ORDER) - 2)
+            point.velocities = [3.0] * 2 + [-1.0] * (
+                len(JOINT_NAMES_ORDER) - 2
+            )  # TODO remove if interpolation is added
             point.accelerations = [-1.0] * len(JOINT_NAMES_ORDER)
             point.effort = [-1.0] * len(JOINT_NAMES_ORDER)
             trajectory_msg.points.append(point)
