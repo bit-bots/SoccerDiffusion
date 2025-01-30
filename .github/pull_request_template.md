@@ -10,6 +10,4 @@
 
 - [ ] Write documentation
 - [ ] Create issues for future work
-- [ ] Test on your machine
-- [ ] Test on the robot
-- [ ] This PR is on our `Software` project board
+- [ ] This PR is on our `DDLitLab` project board
