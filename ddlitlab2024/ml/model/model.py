@@ -19,15 +19,15 @@ class End2EndDiffusionTransformer(nn.Module):
         use_imu: bool,
         imu_orientation_embedding_method: IMUEncoder.OrientationEmbeddingMethod,
         num_imu_encoder_layers: int,
-        max_imu_context_length: int,
+        imu_context_length: int,
         use_joint_states: bool,
         joint_state_encoder_layers: int,
-        max_joint_state_context_length: int,
+        joint_state_context_length: int,
         use_images: bool,
         image_encoder_type: ImageEncoderType,
         image_sequence_encoder_type: SequenceEncoderType,
         num_image_sequence_encoder_layers: int,
-        max_image_context_length: int,
+        image_context_length: int,
         num_decoder_layers: int = 4,
         trajectory_prediction_length: int = 8,
     ):
@@ -58,7 +58,7 @@ class End2EndDiffusionTransformer(nn.Module):
                 hidden_dim=hidden_dim,
                 num_layers=num_imu_encoder_layers,
                 num_heads=4,
-                max_seq_len=max_imu_context_length,
+                max_seq_len=imu_context_length,
             )
             if use_imu
             else None
@@ -71,7 +71,7 @@ class End2EndDiffusionTransformer(nn.Module):
                 hidden_dim=hidden_dim,
                 num_layers=joint_state_encoder_layers,
                 num_heads=4,
-                max_seq_len=max_joint_state_context_length,
+                max_seq_len=joint_state_context_length,
             )
             if use_joint_states
             else None
@@ -84,7 +84,7 @@ class End2EndDiffusionTransformer(nn.Module):
                 image_encoder_type=image_encoder_type,
                 hidden_dim=hidden_dim,
                 num_layers=num_image_sequence_encoder_layers,
-                max_seq_len=max_image_context_length,
+                max_seq_len=image_context_length,
             )
             if use_images
             else None
