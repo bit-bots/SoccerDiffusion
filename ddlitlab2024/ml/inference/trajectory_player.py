@@ -9,6 +9,8 @@ from rclpy.node import Node
 from rclpy.time import Time
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
+from ddlitlab2024 import DEFAULT_RESAMPLE_RATE_HZ
+
 
 class TrajectoryPlayer(Node):
     def __init__(self, node_name, context):
@@ -33,7 +35,7 @@ class TrajectoryPlayer(Node):
         # Current trajectory
         self.current_trajectory = None
 
-        self.create_timer(1 / 50, self.timer_callback)
+        self.create_timer(1 / DEFAULT_RESAMPLE_RATE_HZ, self.timer_callback)
 
     def trajectory_callback(self, msg: JointTrajectory):
         self.current_trajectory = msg

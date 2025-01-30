@@ -22,11 +22,12 @@ from rclpy.time import Time
 from sensor_msgs.msg import Image, JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
+from ddlitlab2024 import DEFAULT_RESAMPLE_RATE_HZ
 from ddlitlab2024.dataset.pytorch import Normalizer
+from ddlitlab2024.dataset.models import JointStates
 from ddlitlab2024.ml.model import End2EndDiffusionTransformer
 from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
-from ddlitlab2024.utils.utils import JOINT_NAMES_ORDER
 
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -42,7 +43,7 @@ class Inference(Node):
         )
 
         # Params
-        self.sample_rate = 50  # Hz
+        self.sample_rate = DEFAULT_RESAMPLE_RATE_HZ
         hidden_dim = 256
         self.action_context_length = 100
         self.trajectory_prediction_length = 10
@@ -90,7 +91,7 @@ class Inference(Node):
         # Add default values to the buffers
         self.image_embeddings = [torch.randn(3, 480, 480)] * self.image_context_length
         self.imu_data = [torch.randn(4)] * self.imu_context_length
-        self.joint_state_data = [torch.randn(len(JOINT_NAMES_ORDER))] * self.joint_state_context_length
+        self.joint_state_data = [torch.randn(len(JointStates.get_ordered_joint_names()))] * self.joint_state_context_length
         self.joint_command_data = [torch.randn(self.num_joints)] * self.action_context_length
 
         self.data_lock = Lock()
@@ -163,16 +164,16 @@ class Inference(Node):
             # First we want to fill the buffers
             if self.latest_joint_state is not None:
                 # Joint names are not in the correct order, so we need to reorder them
-                joint_state = torch.zeros(len(JOINT_NAMES_ORDER))
-                for i, joint_name in enumerate(JOINT_NAMES_ORDER):
+                joint_state = torch.zeros(len(JointStates.get_ordered_joint_names()))
+                for i, joint_name in enumerate(JointStates.get_ordered_joint_names()):
                     idx = self.latest_joint_state.name.index(joint_name)
                     joint_state[i] = self.latest_joint_state.position[idx]
                 self.joint_state_data.append(joint_state)
 
             if self.latest_motor_command is not None:
                 # Joint names are not in the correct order, so we need to reorder them
-                joint_state = torch.zeros(len(JOINT_NAMES_ORDER))
-                for i, joint_name in enumerate(JOINT_NAMES_ORDER):
+                joint_state = torch.zeros(len(JointStates.get_ordered_joint_names()))
+                for i, joint_name in enumerate(JointStates.get_ordered_joint_names()):
                     idx = self.latest_motor_command.joint_names.index(joint_name)
                     joint_state[i] = self.latest_motor_command.positions[idx]
                 self.joint_command_data.append(joint_state)
@@ -267,17 +268,17 @@ class Inference(Node):
         # Publish the trajectory
         trajectory_msg = JointTrajectory()
         trajectory_msg.header.stamp = Time.to_msg(start_ros_time)
-        trajectory_msg.joint_names = JOINT_NAMES_ORDER
+        trajectory_msg.joint_names = JointStates.get_ordered_joint_names()
         trajectory_msg.points = []
         for i in range(self.trajectory_prediction_length):
             point = JointTrajectoryPoint()
             point.positions = trajectory[0, i].cpu().numpy() - np.pi
             point.time_from_start = Duration(nanoseconds=int(1e9 / self.sample_rate * i)).to_msg()
             point.velocities = [3.0] * 2 + [-1.0] * (
-                len(JOINT_NAMES_ORDER) - 2
+                len(JointStates.get_ordered_joint_names()) - 2
             )  # TODO remove if interpolation is added
-            point.accelerations = [-1.0] * len(JOINT_NAMES_ORDER)
-            point.effort = [-1.0] * len(JOINT_NAMES_ORDER)
+            point.accelerations = [-1.0] * len(JointStates.get_ordered_joint_names())
+            point.effort = [-1.0] * len(JointStates.get_ordered_joint_names())
             trajectory_msg.points.append(point)
         self.trajectory_pub.publish(trajectory_msg)
 
