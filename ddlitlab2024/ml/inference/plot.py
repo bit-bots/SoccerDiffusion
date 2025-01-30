@@ -27,7 +27,6 @@ if __name__ == "__main__":
     parser.add_argument("checkpoint", type=str, help="Path to the checkpoint to load")
     parser.add_argument("--steps", type=int, default=30, help="Number of denoising steps (not used for distilled)")
     parser.add_argument("--num_samples", type=int, default=10, help="Number of samples to generate")
-    parser.add_argument("--distilled", action="store_true", help="Use distilled single-step prediction")
     args = parser.parse_args()
 
     # Load the hyperparameters from the checkpoint
@@ -105,7 +104,7 @@ if __name__ == "__main__":
         noisy_trajectory = torch.randn_like(joint_targets).to(device)
         trajectory = noisy_trajectory
 
-        if args.distilled:
+        if params["distilled_decoder"]:
             # Directly predict the trajectory based on the noise
             with torch.no_grad():
                 trajectory = model(batch, noisy_trajectory, torch.tensor([0], device=device))
