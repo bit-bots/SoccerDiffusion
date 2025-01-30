@@ -5,6 +5,7 @@
     "ddlitlab",
     "dtype",
     "dtypes",
+    "frombuffer",
     "ignoretz",
     "mcap",
     "nanosec",
