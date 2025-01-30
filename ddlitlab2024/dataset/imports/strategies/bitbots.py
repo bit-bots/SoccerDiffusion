@@ -121,6 +121,12 @@ class BitBotsImportStrategy(ImportStrategy):
 
         converter.populate_recording_metadata(data, self.model_data.recording)
         model_data = converter.convert_to_model(data, relative_timestamp, self.model_data.recording)
+
+        # @TODO: find a better way to handle interpolation of head movements
+        for idx, command in enumerate(model_data.joint_commands):
+            command.head_pan = model_data.joint_states[idx].head_pan
+            command.head_tilt = model_data.joint_states[idx].head_tilt
+
         self.model_data = self.model_data.merge(model_data)
 
         return self.model_data
