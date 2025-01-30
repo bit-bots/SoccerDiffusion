@@ -104,7 +104,7 @@ if __name__ == "__main__":
         noisy_trajectory = torch.randn_like(joint_targets).to(device)
         trajectory = noisy_trajectory
 
-        if params["distilled_decoder"]:
+        if params.get("distilled_decoder", False):
             # Directly predict the trajectory based on the noise
             with torch.no_grad():
                 trajectory = model(batch, noisy_trajectory, torch.tensor([0], device=device))
