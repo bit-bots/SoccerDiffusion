@@ -36,7 +36,8 @@ if __name__ == "__main__":
     joint_state_context_length = 100
     num_normalization_samples = 50
     num_joints = 20
-    checkpoint = "/homes/17vahl/ddlitlab2024/ddlitlab2024/ml/training/trajectory_transformer_model.pth"
+    checkpoint = "/homes/17vahl/ddlitlab2024/ddlitlab2024/ml/training/destilled_trajectory_transformer_model.pth"
+    distilled = True
 
     logger.info("Load model")
     model = End2EndDiffusionTransformer(
@@ -110,15 +111,20 @@ if __name__ == "__main__":
         noisy_trajectory = torch.randn_like(joint_targets).to(device)
         trajectory = noisy_trajectory
 
-        # Perform the denoising process
-        scheduler.set_timesteps(inference_denosing_timesteps)
-        for t in scheduler.timesteps:
+        if distilled:
+            # Directly predict the trajectory based on the noise
             with torch.no_grad():
-                # Predict the noise residual
-                noise_pred = model(batch, trajectory, torch.tensor([t], device=device))
+                trajectory = model(batch, noisy_trajectory, torch.tensor([0], device=device))
+        else:
+            # Perform the denoising process
+            scheduler.set_timesteps(inference_denosing_timesteps)
+            for t in scheduler.timesteps:
+                with torch.no_grad():
+                    # Predict the noise residual
+                    noise_pred = model(batch, trajectory, torch.tensor([t], device=device))
 
-                # Update the trajectory based on the predicted noise and the current step of the denoising process
-                trajectory = scheduler.step(noise_pred, t, trajectory).prev_sample
+                    # Update the trajectory based on the predicted noise and the current step of the denoising process
+                    trajectory = scheduler.step(noise_pred, t, trajectory).prev_sample
 
         # Undo the normalization
         print(normalizer.mean)
