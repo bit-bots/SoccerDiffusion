@@ -1,15 +1,16 @@
+import argparse
 from dataclasses import asdict
 from functools import partial
 
-import numpy as np
 import torch
 import torch.nn.functional as F  # noqa
+import yaml
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from ema_pytorch import EMA
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from ddlitlab2024.dataset.pytorch import DDLITLab2024Dataset, Normalizer, worker_init_fn
+from ddlitlab2024.dataset.pytorch import DDLITLab2024Dataset, worker_init_fn
 from ddlitlab2024.ml import logger
 from ddlitlab2024.ml.model import End2EndDiffusionTransformer
 from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType
@@ -25,39 +26,56 @@ if __name__ == "__main__":
     logger.info("Starting training")
     logger.info(f"Using device {device}")
     # TODO wandb
-    # Define hyperparameters # TODO proper configuration
-    hidden_dim = 256
-    num_layers = 4
-    num_heads = 4
-    action_context_length = 100
-    trajectory_prediction_length = 10
-    epochs = 50
-    batch_size = 16
-    lr = 1e-4
-    train_denoising_timesteps = 1000
-    image_context_length = 10
-    action_context_length = 100
-    imu_context_length = 100
-    joint_state_context_length = 100
-    num_normalization_samples = 1000
-    inference_denosing_timesteps = 30
-    num_joints = 20
-    checkpoint: str = "trajectory_transformer_model_500_epoch_xmas.pth"
+
+    # Parse the command line arguments
+    parser = argparse.ArgumentParser(description="Distills the multi-step diffusion model into a single-step model")
+    parser.add_argument("config", type=str, help="Path to the training configuration file")
+    parser.add_argument("checkpoint", type=str, help="Path to the checkpoint to load for the teacher model")
+    parser.add_argument(
+        "--output",
+        "-o",
+        type=str,
+        default="distilled_trajectory_transformer_model.pth",
+        help="Path to save the distilled model",
+    )
+    args = parser.parse_args()
+
+    # Load the hyperparameters from the checkpoint
+    logger.info(f"Loading checkpoint '{args.checkpoint}' for the teacher model and as a base for the student model")
+    checkpoint = torch.load(args.checkpoint, weights_only=True)
+    teacher_params = checkpoint["hyperparams"]
+
+    # Load the hyperparameters from the configuration file
+    logger.info(f"Loading configuration file '{args.config}'")
+    with open(args.config) as file:
+        params = yaml.safe_load(file)
+
+    # Print the differences between the checkpoint and the configuration file
+    for key, value in params.items():
+        if key not in teacher_params:
+            logger.warning(f"Parameter '{key}' in the config not found in the checkpoints hyperparameters")
+        elif value != teacher_params[key]:
+            logger.warning(
+                f"Parameter '{key}' has a different value in the teacher checkpoint: {teacher_params[key]} != {value}"
+            )
+
+    # Flag the student model as distilled
+    params["distilled_decoder"] = True
 
     # Load the dataset (primary for example conditioning)
     logger.info("Create dataset objects")
     dataset = DDLITLab2024Dataset(
-        num_joints=num_joints,
-        num_frames_video=image_context_length,
-        num_samples_joint_trajectory_future=trajectory_prediction_length,
-        num_samples_joint_trajectory=action_context_length,
-        num_samples_imu=imu_context_length,
-        num_samples_joint_states=joint_state_context_length,
+        num_joints=params["num_joints"],
+        num_frames_video=params["image_context_length"],
+        num_samples_joint_trajectory_future=params["trajectory_prediction_length"],
+        num_samples_joint_trajectory=params["action_context_length"],
+        num_samples_imu=params["imu_context_length"],
+        num_samples_joint_states=params["joint_state_context_length"],
     )
     num_workers = 5
     dataloader = DataLoader(
         dataset,
-        batch_size=batch_size,
+        batch_size=params["batch_size"],
         shuffle=True,
         collate_fn=DDLITLab2024Dataset.collate_fn,
         persistent_workers=num_workers > 1,
@@ -66,26 +84,28 @@ if __name__ == "__main__":
         worker_init_fn=worker_init_fn,
     )
 
-    model_config = dict(  # TODO enforce all params to be consistent with the dataset
-        num_joints=num_joints,
-        hidden_dim=hidden_dim,
-        use_action_history=True,
-        num_action_history_encoder_layers=2,
-        max_action_context_length=action_context_length,
-        use_imu=True,
-        imu_orientation_embedding_method=IMUEncoder.OrientationEmbeddingMethod.QUATERNION,
-        num_imu_encoder_layers=2,
-        max_imu_context_length=imu_context_length,
-        use_joint_states=True,
-        joint_state_encoder_layers=2,
-        max_joint_state_context_length=joint_state_context_length,
-        use_images=True,
-        image_sequence_encoder_type=SequenceEncoderType.TRANSFORMER,
-        image_encoder_type=ImageEncoderType.RESNET18,
-        num_image_sequence_encoder_layers=1,
-        max_image_context_length=image_context_length,
-        num_decoder_layers=4,
-        trajectory_prediction_length=trajectory_prediction_length,
+    model_config = dict(
+        num_joints=params["num_joints"],
+        hidden_dim=params["hidden_dim"],
+        use_action_history=params["use_action_history"],
+        num_action_history_encoder_layers=params["num_action_history_encoder_layers"],
+        max_action_context_length=params["action_context_length"],
+        use_imu=params["use_imu"],
+        imu_orientation_embedding_method=IMUEncoder.OrientationEmbeddingMethod(
+            params["imu_orientation_embedding_method"]
+        ),
+        num_imu_encoder_layers=params["num_imu_encoder_layers"],
+        imu_context_length=params["imu_context_length"],
+        use_joint_states=params["use_joint_states"],
+        joint_state_encoder_layers=params["joint_state_encoder_layers"],
+        joint_state_context_length=params["joint_state_context_length"],
+        use_images=params["use_images"],
+        image_sequence_encoder_type=SequenceEncoderType(params["image_sequence_encoder_type"]),
+        image_encoder_type=ImageEncoderType(params["image_encoder_type"]),
+        num_image_sequence_encoder_layers=params["num_image_sequence_encoder_layers"],
+        image_context_length=params["image_context_length"],
+        num_decoder_layers=params["num_decoder_layers"],
+        trajectory_prediction_length=params["trajectory_prediction_length"],
     )
 
     # Initialize the Transformer model and optimizer, and move model to device
@@ -108,15 +128,17 @@ if __name__ == "__main__":
     student_ema.load_state_dict(torch.load(checkpoint, weights_only=True))
 
     # Create optimizer and learning rate scheduler
-    optimizer = torch.optim.AdamW(student_model.parameters(), lr=lr)
-    lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, total_steps=epochs * len(dataloader))
+    optimizer = torch.optim.AdamW(student_model.parameters(), lr=params["lr"])
+    lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer, max_lr=params["lr"], total_steps=params["epochs"] * len(dataloader)
+    )
 
     # Create diffusion noise scheduler
     scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2", clip_sample=False)
-    scheduler.config["num_train_timesteps"] = train_denoising_timesteps
+    scheduler.config["num_train_timesteps"] = params["train_denoising_timesteps"]
 
     # Training loop
-    for epoch in range(epochs):
+    for epoch in range(params["epochs"]):
         mean_loss = 0
 
         # Iterate over the dataset
@@ -140,7 +162,7 @@ if __name__ == "__main__":
                 # Perform the embedding of the conditioning
                 embedded_input = teacher_model.encode_input_data(batch)
 
-                scheduler.set_timesteps(inference_denosing_timesteps)
+                scheduler.set_timesteps(params["distill_teacher_inference_steps"])
                 for t in scheduler.timesteps:
                     with torch.no_grad():
                         # Predict the noise residual
@@ -148,12 +170,15 @@ if __name__ == "__main__":
                             embedded_input, trajectory, torch.full((joint_targets.size(0),), t, device=device)
                         )
 
-                        # Update the trajectory based on the predicted noise and the current step of the denoising process
+                        # Update the trajectory based on the predicted noise and
+                        # the current step of the denoising process
                         trajectory = scheduler.step(noise_pred, t, trajectory).prev_sample
 
-            # Predict the denoised trajectory directly using the student model (null the timestep, as we are doing a single step prediction)
+            # Predict the denoised trajectory directly using the student model
+            # (null the timestep, as we are doing a single step prediction)
             student_trajectory_prediction = student_model.forward_with_context(
-                embedded_input, noisy_trajectory, torch.zeros(joint_targets.size(0), device=device))
+                embedded_input, noisy_trajectory, torch.zeros(joint_targets.size(0), device=device)
+            )
 
             # Compute the loss
             loss = F.mse_loss(student_trajectory_prediction, trajectory)
@@ -171,4 +196,11 @@ if __name__ == "__main__":
             )
 
         # Save the model
-        torch.save(student_ema.state_dict(), "destilled_trajectory_transformer_model.pth")
+        checkpoint = {
+            "model_state_dict": student_ema.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "lr_scheduler_state_dict": lr_scheduler.state_dict(),
+            "hyperparams": params,
+            "current_epoch": epoch,
+        }
+        torch.save(checkpoint, args.output)
