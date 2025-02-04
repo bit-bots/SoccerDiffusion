@@ -34,6 +34,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output", "-o", type=str, default="trajectory_transformer_model.pth", help="Path to save the model"
     )
+    parser.add_argument("--decoder-pretraining", action="store_true", help="Unconditionally train the decoder first")
     args = parser.parse_args()
 
     assert (
@@ -76,8 +77,13 @@ if __name__ == "__main__":
         num_samples_joint_trajectory=params["action_context_length"],
         num_samples_imu=params["imu_context_length"],
         num_samples_joint_states=params["joint_state_context_length"],
+        use_action_history=not args.decoder_pretraining,
+        use_imu=not args.decoder_pretraining,
+        use_joint_states=not args.decoder_pretraining,
+        use_images=not args.decoder_pretraining,
+        use_game_state=not args.decoder_pretraining,
     )
-    num_workers = 5
+    num_workers = 5 if not args.decoder_pretraining else 24
     dataloader = DataLoader(
         dataset,
         batch_size=params["batch_size"],
@@ -92,7 +98,7 @@ if __name__ == "__main__":
     # Get some samples to estimate the mean and std
     logger.info("Estimating normalization parameters")
     random_indices = np.random.randint(0, len(dataset), (params["num_normalization_samples"],))
-    normalization_samples = torch.cat([dataset[i].joint_command_history for i in tqdm(random_indices)], dim=0)
+    normalization_samples = torch.cat([dataset[i].joint_command for i in tqdm(random_indices)], dim=0)
     normalizer = Normalizer.fit(normalization_samples.to(device))
 
     # Initialize the Transformer model and optimizer, and move model to device
@@ -102,16 +108,16 @@ if __name__ == "__main__":
         use_action_history=params["use_action_history"],
         num_action_history_encoder_layers=params["num_action_history_encoder_layers"],
         max_action_context_length=params["action_context_length"],
-        use_imu=params["use_imu"],
+        use_imu=params["use_imu"] and not args.decoder_pretraining,
         imu_orientation_embedding_method=IMUEncoder.OrientationEmbeddingMethod(
             params["imu_orientation_embedding_method"]
         ),
         num_imu_encoder_layers=params["num_imu_encoder_layers"],
         imu_context_length=params["imu_context_length"],
-        use_joint_states=params["use_joint_states"],
+        use_joint_states=params["use_joint_states"] and not args.decoder_pretraining,
         joint_state_encoder_layers=params["joint_state_encoder_layers"],
         joint_state_context_length=params["joint_state_context_length"],
-        use_images=params["use_images"],
+        use_images=params["use_images"] and not args.decoder_pretraining,
         image_sequence_encoder_type=SequenceEncoderType(params["image_sequence_encoder_type"]),
         image_encoder_type=ImageEncoderType(params["image_encoder_type"]),
         num_image_sequence_encoder_layers=params["num_image_sequence_encoder_layers"],
@@ -158,17 +164,24 @@ if __name__ == "__main__":
     scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2", clip_sample=False)
     scheduler.config["num_train_timesteps"] = params["train_denoising_timesteps"]
 
+    # Dummy conditioning context for the decoder pretraining
+    if args.decoder_pretraining:
+        dummy_context = torch.zeros((params["batch_size"], 1, params["hidden_dim"]), device=device)
+
     # Training loop
     for epoch in range(params["epochs"]):
-        mean_loss = 0
-
         # Iterate over the dataset
-        for i, batch in enumerate(pbar := tqdm(dataloader)):
+        for _i, batch in enumerate(pbar := tqdm(dataloader)):
             # Move the data to the device
-            batch = {k: v.to(device) for k, v in asdict(batch).items()}
+            batch = {k: v.to(device) for k, v in asdict(batch).items() if v is not None}
 
             # Extract the target actions
             joint_targets = batch["joint_command"]
+
+            # Extract the batch size of the current batch
+            # It might be different from the batch size in the hyperparameters
+            # due to the last batch being smaller
+            bs = joint_targets.size(0)
 
             # Normalize the target actions
             joint_targets = normalizer.normalize(joint_targets)
@@ -188,21 +201,20 @@ if __name__ == "__main__":
             noisy_trajectory = scheduler.add_noise(joint_targets, noise, random_timesteps)
 
             # Predict the error using the model
-            predicted_traj = model(batch, noisy_trajectory, random_timesteps)
+            if args.decoder_pretraining:
+                predicted_traj = model.forward_with_context([dummy_context[:bs]], noisy_trajectory, random_timesteps)
+            else:
+                predicted_traj = model(batch, noisy_trajectory, random_timesteps)
 
             # Compute the loss
             loss = F.mse_loss(predicted_traj, noise)
-
-            mean_loss += loss.item()
 
             # Backpropagation and optimization
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
 
-            pbar.set_postfix_str(
-                f"Epoch {epoch}, Loss: {mean_loss / (i + 1):.05f}, LR: {lr_scheduler.get_last_lr()[0]:0.7f}"
-            )
+            pbar.set_postfix_str(f"Epoch {epoch}, Loss: {loss.item():.05f}, LR: {lr_scheduler.get_last_lr()[0]:0.7f}")
 
         # Save the model
         checkpoint = {
