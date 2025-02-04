@@ -255,7 +255,9 @@ class Inference(Node):
         if self.hyper_params.get("distilled_decoder", False):
             # Directly predict the trajectory based on the noise
             with torch.no_grad():
-                trajectory = self.model.forward_with_context(embedded_input, trajectory, torch.tensor([0], device=device))
+                trajectory = self.model.forward_with_context(
+                    embedded_input, trajectory, torch.tensor([0], device=device)
+                )
         else:
             # Perform the denoising process
             self.scheduler.set_timesteps(self.inference_denosing_timesteps)
