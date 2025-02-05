@@ -2,10 +2,10 @@ import torch
 from torch import nn
 
 from ddlitlab2024.ml.model.decoder import DiffusionActionGenerator
+from ddlitlab2024.ml.model.encoder.game_state import GameStateEncoder
 from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType, image_sequence_encoder_factory
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 from ddlitlab2024.ml.model.encoder.joint import JointEncoder
-from ddlitlab2024.ml.model.encoder.game_state import GameStateEncoder
 from ddlitlab2024.ml.model.misc import StepToken
 
 
@@ -97,9 +97,7 @@ class End2EndDiffusionTransformer(nn.Module):
         )
 
         # Gamestate encoder
-        self.game_state_encoder = (
-            GameStateEncoder(hidden_dim) if use_gamestate else None
-        )
+        self.game_state_encoder = GameStateEncoder(hidden_dim) if use_gamestate else None
 
         # Define the decoder model for the diffusion denoising process
         self.diffusion_action_generator = DiffusionActionGenerator(
