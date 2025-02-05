@@ -4,6 +4,7 @@ from functools import partial
 
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F  # noqa
 import yaml
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
@@ -35,6 +36,7 @@ if __name__ == "__main__":
         "--output", "-o", type=str, default="trajectory_transformer_model.pth", help="Path to save the model"
     )
     parser.add_argument("--decoder-pretraining", action="store_true", help="Unconditionally train the decoder first")
+    parser.add_argument("--pretrained-decoder", type=str, default=None, help="Path to the pretrained decoder model")
     args = parser.parse_args()
 
     assert (
@@ -139,6 +141,12 @@ if __name__ == "__main__":
         logger.info("Loading model from checkpoint")
         model.load_state_dict(checkpoint["model_state_dict"])
 
+    # Load the pretrained decoder model if provided
+    if args.pretrained_decoder is not None:
+        logger.info("Loading pretrained decoder model")
+        decoder_checkpoint = torch.load(args.pretrained_decoder, weights_only=True)
+        model.load_state_dict(decoder_checkpoint["model_state_dict"], strict=False)
+
     # Create optimizer and learning rate scheduler
     optimizer = torch.optim.AdamW(model.parameters(), lr=params["lr"])
 
@@ -166,10 +174,6 @@ if __name__ == "__main__":
     scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2", clip_sample=False)
     scheduler.config["num_train_timesteps"] = params["train_denoising_timesteps"]
 
-    # Dummy conditioning context for the decoder pretraining
-    if args.decoder_pretraining:
-        dummy_context = torch.zeros((params["batch_size"], 1, params["hidden_dim"]), device=device)
-
     # Training loop
     for epoch in range(params["epochs"]):
         # Iterate over the dataset
@@ -188,6 +192,7 @@ if __name__ == "__main__":
             # Normalize the target actions
             joint_targets = normalizer.normalize(joint_targets)
 
+
             # Reset the gradients
             optimizer.zero_grad()
 
@@ -204,7 +209,8 @@ if __name__ == "__main__":
 
             # Predict the error using the model
             if args.decoder_pretraining:
-                predicted_traj = model.forward_with_context([dummy_context[:bs]], noisy_trajectory, random_timesteps)
+                predicted_traj = model.forward_with_context(
+                    [torch.randn((bs, 10, params["hidden_dim"]), device=device)], noisy_trajectory, random_timesteps)
             else:
                 predicted_traj = model(batch, noisy_trajectory, random_timesteps)
 
