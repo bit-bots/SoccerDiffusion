@@ -78,6 +78,11 @@ if __name__ == "__main__":
         num_samples_joint_trajectory=params["action_context_length"],
         num_samples_imu=params["imu_context_length"],
         num_samples_joint_states=params["joint_state_context_length"],
+        use_action_history=params["use_action_history"],
+        use_imu=params["use_imu"],
+        use_joint_states=params["use_joint_states"],
+        use_images=params["use_images"],
+        use_game_state=params["use_gamestate"],
     )
 
     # Create DataLoader object

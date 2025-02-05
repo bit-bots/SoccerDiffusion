@@ -77,11 +77,11 @@ if __name__ == "__main__":
         num_samples_joint_trajectory=params["action_context_length"],
         num_samples_imu=params["imu_context_length"],
         num_samples_joint_states=params["joint_state_context_length"],
-        use_action_history=not args.decoder_pretraining,
-        use_imu=not args.decoder_pretraining,
-        use_joint_states=not args.decoder_pretraining,
-        use_images=not args.decoder_pretraining,
-        use_game_state=not args.decoder_pretraining,
+        use_action_history=params["use_action_history"],
+        use_imu=params["use_imu"],
+        use_joint_states=params["use_joint_states"],
+        use_images=params["use_images"],
+        use_game_state=params["use_gamestate"],
     )
     num_workers = 5 if not args.decoder_pretraining else 24
     dataloader = DataLoader(
@@ -108,16 +108,16 @@ if __name__ == "__main__":
         use_action_history=params["use_action_history"],
         num_action_history_encoder_layers=params["num_action_history_encoder_layers"],
         max_action_context_length=params["action_context_length"],
-        use_imu=params["use_imu"] and not args.decoder_pretraining,
+        use_imu=params["use_imu"],
         imu_orientation_embedding_method=IMUEncoder.OrientationEmbeddingMethod(
             params["imu_orientation_embedding_method"]
         ),
         num_imu_encoder_layers=params["num_imu_encoder_layers"],
         imu_context_length=params["imu_context_length"],
-        use_joint_states=params["use_joint_states"] and not args.decoder_pretraining,
+        use_joint_states=params["use_joint_states"],
         joint_state_encoder_layers=params["joint_state_encoder_layers"],
         joint_state_context_length=params["joint_state_context_length"],
-        use_images=params["use_images"] and not args.decoder_pretraining,
+        use_images=params["use_images"],
         image_sequence_encoder_type=SequenceEncoderType(params["image_sequence_encoder_type"]),
         image_encoder_type=ImageEncoderType(params["image_encoder_type"]),
         num_image_sequence_encoder_layers=params["num_image_sequence_encoder_layers"],
