@@ -6,7 +6,9 @@ class JointEncoder(BaseEncoder):
     Joint encoder that encodes the joint states of the robot.
     """
 
-    def __init__(self, num_joints: int, patch_size: int, hidden_dim: int, num_layers: int, num_heads: int, max_seq_len: int):
+    def __init__(
+        self, num_joints: int, patch_size: int, hidden_dim: int, num_layers: int, num_heads: int, max_seq_len: int
+    ):
         """
         Initializes the module.
 

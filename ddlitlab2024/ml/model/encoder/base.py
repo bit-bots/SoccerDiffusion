@@ -9,7 +9,9 @@ class BaseEncoder(nn.Module):
     Transformer encoder that encodes a sequence of input vectors into context tokens.
     """
 
-    def __init__(self, input_dim: int, patch_size:int, hidden_dim: int, num_layers: int, num_heads: int, max_seq_len: int):
+    def __init__(
+        self, input_dim: int, patch_size: int, hidden_dim: int, num_layers: int, num_heads: int, max_seq_len: int
+    ):
         """
         Initializes the module.
 

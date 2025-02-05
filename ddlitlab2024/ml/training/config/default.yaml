@@ -1,8 +1,8 @@
 hidden_dim: 256
 action_context_length: 100
 trajectory_prediction_length: 10
-epochs: 500
-batch_size: 16
+epochs: 1
+batch_size: 8
 lr: 1.e-4
 train_denoising_timesteps: 1000
 image_context_length: 10

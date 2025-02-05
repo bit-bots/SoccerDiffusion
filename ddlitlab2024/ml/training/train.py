@@ -4,7 +4,6 @@ from functools import partial
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F  # noqa
 import yaml
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
@@ -192,7 +191,6 @@ if __name__ == "__main__":
             # Normalize the target actions
             joint_targets = normalizer.normalize(joint_targets)
 
-
             # Reset the gradients
             optimizer.zero_grad()
 
@@ -210,7 +208,8 @@ if __name__ == "__main__":
             # Predict the error using the model
             if args.decoder_pretraining:
                 predicted_traj = model.forward_with_context(
-                    [torch.randn((bs, 10, params["hidden_dim"]), device=device)], noisy_trajectory, random_timesteps)
+                    [torch.randn((bs, 10, params["hidden_dim"]), device=device)], noisy_trajectory, random_timesteps
+                )
             else:
                 predicted_traj = model(batch, noisy_trajectory, random_timesteps)
 
