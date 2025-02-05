@@ -278,7 +278,6 @@ class DDLITLab2024Dataset(Dataset):
 
         return torch.tensor(int(game_state))
 
-    @profile
     def __getitem__(self, idx: int) -> Result:
         # Find the recording that contains the sample
         for start_sample, end_sample, recording_id in self.sample_boundaries:
