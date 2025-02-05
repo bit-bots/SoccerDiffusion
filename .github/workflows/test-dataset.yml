@@ -29,12 +29,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Create DB schema
-        run: poetry run cli db create-schema
+      - name: Setup DB with alembic migrations
+        run: |
+          cd ./ddlitlab2024/dataset
+          poetry run alembic upgrade head
 
       - name: Populate DB with dummy data
         run: |
-          poetry run cli db create-schema
           poetry run cli db dummy-data -n 2 -s 100 -i 10
 
       - name: Test rosbag import with invalid training data fails
@@ -51,7 +52,6 @@ jobs:
             echo "Import should have failed!"
             exit 1
           fi
-
 
       - name: Test rosbag import with valid training data
         run: |
