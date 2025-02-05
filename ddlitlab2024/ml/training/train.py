@@ -92,6 +92,7 @@ if __name__ == "__main__":
         collate_fn=DDLITLab2024Dataset.collate_fn,
         persistent_workers=num_workers > 1,
         # prefetch_factor=10 * num_workers,
+        pin_memory=True,
         num_workers=num_workers,
         worker_init_fn=worker_init_fn,
     )
@@ -178,7 +179,7 @@ if __name__ == "__main__":
         # Iterate over the dataset
         for _i, batch in enumerate(pbar := tqdm(dataloader)):
             # Move the data to the device
-            batch = {k: v.to(device) for k, v in asdict(batch).items() if v is not None}
+            batch = {k: v.to(device, non_blocking=True) for k, v in asdict(batch).items() if v is not None}
 
             # Extract the target actions
             joint_targets = batch["joint_command"]
