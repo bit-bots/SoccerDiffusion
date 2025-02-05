@@ -43,7 +43,7 @@ class Inference(Node):
 
         checkpoint_path = (
             "../training/destilled_trajectory_transformer_model_first_train_20_epoch_hyp.pth"
-            #"../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
+            # "../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
         )
         self.inference_denosing_timesteps = 30
 
