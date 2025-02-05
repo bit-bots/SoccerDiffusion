@@ -92,7 +92,6 @@ if __name__ == "__main__":
         collate_fn=DDLITLab2024Dataset.collate_fn,
         persistent_workers=num_workers > 1,
         # prefetch_factor=10 * num_workers,
-        pin_memory=True,
         num_workers=num_workers,
         worker_init_fn=worker_init_fn,
     )
