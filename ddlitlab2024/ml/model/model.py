@@ -105,7 +105,9 @@ class End2EndDiffusionTransformer(nn.Module):
         self.diffusion_action_generator = DiffusionActionGenerator(
             num_joints=num_joints,
             hidden_dim=hidden_dim,
-            seq_len=trajectory_prediction_length,
+            num_layers=num_decoder_layers,
+            num_heads=4,
+            max_seq_len=trajectory_prediction_length,
         )
 
         # Store normalization parameters
@@ -165,7 +167,7 @@ class End2EndDiffusionTransformer(nn.Module):
         step_token = self.step_encoding(step)
 
         # Concatenate the context
-        context_tensor = torch.cat(context + [step_token], dim=1).mean(dim=1)
+        context_tensor = torch.cat(context + [step_token], dim=1)
 
         # Denoise the noisy action predictions
         return self.diffusion_action_generator(noisy_action_predictions, context_tensor)
