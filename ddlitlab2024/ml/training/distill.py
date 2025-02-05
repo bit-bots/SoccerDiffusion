@@ -71,6 +71,11 @@ if __name__ == "__main__":
         num_samples_joint_trajectory=params["action_context_length"],
         num_samples_imu=params["imu_context_length"],
         num_samples_joint_states=params["joint_state_context_length"],
+        use_action_history=params["use_action_history"],
+        use_imu=params["use_imu"],
+        use_joint_states=params["use_joint_states"],
+        use_images=params["use_images"],
+        use_game_state=params["use_gamestate"],
     )
     num_workers = 5
     dataloader = DataLoader(
@@ -106,6 +111,8 @@ if __name__ == "__main__":
         image_context_length=params["image_context_length"],
         num_decoder_layers=params["num_decoder_layers"],
         trajectory_prediction_length=params["trajectory_prediction_length"],
+        use_gamestate=params["use_gamestate"],
+        encoder_patch_size=params["encoder_patch_size"],
     )
 
     # Initialize the Transformer model and optimizer, and move model to device
