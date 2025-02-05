@@ -57,6 +57,8 @@ if __name__ == "__main__":
         image_context_length=params["image_context_length"],
         num_decoder_layers=params["num_decoder_layers"],
         trajectory_prediction_length=params["trajectory_prediction_length"],
+        use_gamestate=params["use_gamestate"],
+        encoder_patch_size=params["encoder_patch_size"],
     ).to(device)
     normalizer = Normalizer(model.mean, model.std)
     model.load_state_dict(checkpoint["model_state_dict"])

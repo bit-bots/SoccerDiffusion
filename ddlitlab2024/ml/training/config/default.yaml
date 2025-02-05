@@ -24,3 +24,5 @@ image_encoder_type: "resnet18"
 num_image_sequence_encoder_layers: 1
 num_decoder_layers: 4
 distill_teacher_inference_steps: 30
+use_gamestate: True
+encoder_patch_size: 10
