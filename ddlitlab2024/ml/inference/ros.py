@@ -125,6 +125,8 @@ class Inference(Node):
             image_context_length=self.hyper_params["image_context_length"],
             num_decoder_layers=self.hyper_params["num_decoder_layers"],
             trajectory_prediction_length=self.hyper_params["trajectory_prediction_length"],
+            use_gamestate=self.hyper_params["use_gamestate"],
+            encoder_patch_size=self.hyper_params["encoder_patch_size"],
         ).to(device)
         self.normalizer = Normalizer(self.model.mean, self.model.std)
         self.model.load_state_dict(checkpoint["model_state_dict"])

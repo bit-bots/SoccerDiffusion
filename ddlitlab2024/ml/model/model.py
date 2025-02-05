@@ -5,6 +5,7 @@ from ddlitlab2024.ml.model.decoder import DiffusionActionGenerator
 from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType, image_sequence_encoder_factory
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 from ddlitlab2024.ml.model.encoder.joint import JointEncoder
+from ddlitlab2024.ml.model.encoder.game_state import GameStateEncoder
 from ddlitlab2024.ml.model.misc import StepToken
 
 
@@ -16,6 +17,7 @@ class End2EndDiffusionTransformer(nn.Module):
         use_action_history: bool,
         num_action_history_encoder_layers: int,
         max_action_context_length: int,
+        encoder_patch_size: int,
         use_imu: bool,
         imu_orientation_embedding_method: IMUEncoder.OrientationEmbeddingMethod,
         num_imu_encoder_layers: int,
@@ -28,8 +30,9 @@ class End2EndDiffusionTransformer(nn.Module):
         image_sequence_encoder_type: SequenceEncoderType,
         num_image_sequence_encoder_layers: int,
         image_context_length: int,
-        num_decoder_layers: int = 4,
-        trajectory_prediction_length: int = 8,
+        use_gamestate: bool,
+        num_decoder_layers: int,
+        trajectory_prediction_length: int,
     ):
         super().__init__()
 
@@ -42,6 +45,7 @@ class End2EndDiffusionTransformer(nn.Module):
         self.action_history_encoder = (
             JointEncoder(
                 num_joints=num_joints,
+                patch_size=encoder_patch_size,
                 hidden_dim=hidden_dim,
                 num_layers=num_action_history_encoder_layers,
                 num_heads=4,
@@ -55,6 +59,7 @@ class End2EndDiffusionTransformer(nn.Module):
         self.imu_encoder = (
             IMUEncoder(
                 orientation_embedding_method=imu_orientation_embedding_method,
+                patch_size=encoder_patch_size,
                 hidden_dim=hidden_dim,
                 num_layers=num_imu_encoder_layers,
                 num_heads=4,
@@ -68,6 +73,7 @@ class End2EndDiffusionTransformer(nn.Module):
         self.joint_states_encoder = (
             JointEncoder(
                 num_joints=num_joints,
+                patch_size=encoder_patch_size,
                 hidden_dim=hidden_dim,
                 num_layers=joint_state_encoder_layers,
                 num_heads=4,
@@ -88,6 +94,11 @@ class End2EndDiffusionTransformer(nn.Module):
             )
             if use_images
             else None
+        )
+
+        # Gamestate encoder
+        self.game_state_encoder = (
+            GameStateEncoder(hidden_dim) if use_gamestate else None
         )
 
         # Define the decoder model for the diffusion denoising process
@@ -123,8 +134,10 @@ class End2EndDiffusionTransformer(nn.Module):
             context.append(self.joint_states_encoder(input_data["joint_state"]))
         if self.image_sequence_encoder is not None:
             context.append(self.image_sequence_encoder(input_data["image_data"]))
+        if self.game_state_encoder is not None:
+            context.append(self.game_state_encoder(input_data["game_state"]))
 
-        # TODO utilize gamestate and image time stamps
+        # TODO utilize image time stamps
 
         return context
 

@@ -95,7 +95,7 @@ class TransformerImageSequenceEncoder(nn.Module):
         super().__init__()
         self.image_encoder = image_encoder
         self.transformer_encoder = BaseEncoder(
-            input_dim=hidden_dim, hidden_dim=hidden_dim, num_layers=num_layers, num_heads=8, max_seq_len=max_seq_len
+            input_dim=hidden_dim, patch_size=1, hidden_dim=hidden_dim, num_layers=num_layers, num_heads=8, max_seq_len=max_seq_len
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
