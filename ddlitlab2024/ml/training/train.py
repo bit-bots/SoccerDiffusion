@@ -5,6 +5,7 @@ from functools import partial
 import numpy as np
 import torch
 import torch.nn.functional as F  # noqa
+import wandb
 import yaml
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from torch.utils.data import DataLoader
@@ -68,6 +69,9 @@ if __name__ == "__main__":
 
         # Now we are ready to use the configuration file
         params = config_params
+
+    # Initialize the weights and biases logging
+    run = wandb.init(project="ddlitlab-2024", config=params)
 
     # Load the dataset
     logger.info("Create dataset objects")
@@ -135,6 +139,9 @@ if __name__ == "__main__":
     logger.info(f"Normalization values:\nJoint mean: {normalizer.mean}\nJoint std: {normalizer.std}")
     assert all(model.std != 0), "Normalization std is zero, this makes no sense. Some joints are constant."
 
+    # Log gradients and parameters to wandb
+    run.watch(model)
+
     # Load the model if a checkpoint is provided
     if args.checkpoint is not None:
         logger.info("Loading model from checkpoint")
@@ -176,7 +183,7 @@ if __name__ == "__main__":
     # Training loop
     for epoch in range(params["epochs"]):
         # Iterate over the dataset
-        for _i, batch in enumerate(pbar := tqdm(dataloader)):
+        for i, batch in enumerate(pbar := tqdm(dataloader)):
             # Move the data to the device
             batch = {k: v.to(device, non_blocking=True) for k, v in asdict(batch).items() if v is not None}
 
@@ -216,12 +223,16 @@ if __name__ == "__main__":
             # Compute the loss
             loss = F.mse_loss(predicted_traj, noise)
 
+            if i % 20 == 0:
+                pbar.set_postfix_str(
+                    f"Epoch {epoch}, Loss: {loss.item():.05f}, LR: {lr_scheduler.get_last_lr()[0]:0.7f}"
+                )
+                run.log({"loss": loss.item(), "lr": lr_scheduler.get_last_lr()[0]}, step=(i + epoch * len(dataloader)))
+
             # Backpropagation and optimization
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-
-            pbar.set_postfix_str(f"Epoch {epoch}, Loss: {loss.item():.05f}, LR: {lr_scheduler.get_last_lr()[0]:0.7f}")
 
         # Save the model
         checkpoint = {
@@ -232,3 +243,6 @@ if __name__ == "__main__":
             "current_epoch": epoch,
         }
         torch.save(checkpoint, args.output)
+
+    # Finish the run cleanly
+    run.finish()
