@@ -2,6 +2,8 @@ import argparse
 from dataclasses import asdict
 from functools import partial
 
+from torch.profiler import profile, ProfilerActivity
+
 import numpy as np
 import torch
 import torch.nn.functional as F  # noqa
@@ -71,7 +73,7 @@ if __name__ == "__main__":
         params = config_params
 
     # Initialize the weights and biases logging
-    run = wandb.init(project="ddlitlab-2024", config=params)
+    run = wandb.init(entity="bitbots", project="ddlitlab-2024", config=params)
 
     # Load the dataset
     logger.info("Create dataset objects")
@@ -88,7 +90,7 @@ if __name__ == "__main__":
         use_images=params["use_images"],
         use_game_state=params["use_gamestate"],
     )
-    num_workers = 5 if not args.decoder_pretraining else 24
+    num_workers = 32 if not args.decoder_pretraining else 24
     dataloader = DataLoader(
         dataset,
         batch_size=params["batch_size"],
@@ -221,8 +223,8 @@ if __name__ == "__main__":
                 predicted_traj = model(batch, noisy_trajectory, random_timesteps)
 
             # Compute the loss
-            loss = F.mse_loss(predicted_traj, noise)
-
+            loss = F.mse_loss(predicted_traj, noise)    
+            
             if i % 20 == 0:
                 pbar.set_postfix_str(
                     f"Epoch {epoch}, Loss: {loss.item():.05f}, LR: {lr_scheduler.get_last_lr()[0]:0.7f}"
@@ -246,3 +248,4 @@ if __name__ == "__main__":
 
     # Finish the run cleanly
     run.finish()
+
