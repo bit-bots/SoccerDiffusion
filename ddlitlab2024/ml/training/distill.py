@@ -6,7 +6,6 @@ import torch
 import torch.nn.functional as F  # noqa
 import yaml
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
-from ema_pytorch import EMA
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -118,21 +117,17 @@ if __name__ == "__main__":
     # Initialize the Transformer model and optimizer, and move model to device
     teacher_model = End2EndDiffusionTransformer(**model_config).to(device)
 
-    # Utilize an Exponential Moving Average (EMA) for the model to smooth out the training process
-    teacher_ema = EMA(teacher_model, beta=0.999)
-
     # Load the model if a checkpoint is provided
     logger.info(f"Loading model from {checkpoint}")
-    teacher_ema.load_state_dict(torch.load(checkpoint, weights_only=True))
+    teacher_model.load_state_dict(checkpoint["model_state_dict"])
 
     # Clone the model
     student_model = End2EndDiffusionTransformer(**model_config).to(device)
 
     # Load the same checkpoint into the student model
     # I load it from disk do avoid any potential issues when copying the model
-    student_ema = EMA(student_model, beta=0.999)
     logger.info(f"Loading model from {checkpoint}")
-    student_ema.load_state_dict(torch.load(checkpoint, weights_only=True))
+    student_model.load_state_dict(torch.load(args.checkpoint, weights_only=True)["model_state_dict"])
 
     # Create optimizer and learning rate scheduler
     optimizer = torch.optim.AdamW(student_model.parameters(), lr=params["lr"])
@@ -196,7 +191,6 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            student_ema.update()
 
             pbar.set_postfix_str(
                 f"Epoch {epoch}, Loss: {mean_loss / (i + 1):.05f}, LR: {lr_scheduler.get_last_lr()[0]:0.7f}"
@@ -204,7 +198,7 @@ if __name__ == "__main__":
 
         # Save the model
         checkpoint = {
-            "model_state_dict": student_ema.state_dict(),
+            "model_state_dict": student_model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
             "lr_scheduler_state_dict": lr_scheduler.state_dict(),
             "hyperparams": params,
