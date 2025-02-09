@@ -118,7 +118,7 @@ if __name__ == "__main__":
     teacher_model = End2EndDiffusionTransformer(**model_config).to(device)
 
     # Load the model if a checkpoint is provided
-    logger.info(f"Loading model from {checkpoint}")
+    logger.info(f"Loading teacher model")
     teacher_model.load_state_dict(checkpoint["model_state_dict"])
 
     # Clone the model
@@ -126,7 +126,7 @@ if __name__ == "__main__":
 
     # Load the same checkpoint into the student model
     # I load it from disk do avoid any potential issues when copying the model
-    logger.info(f"Loading model from {checkpoint}")
+    logger.info(f"Loading student model from teacher checkpoint")
     student_model.load_state_dict(torch.load(args.checkpoint, weights_only=True)["model_state_dict"])
 
     # Create optimizer and learning rate scheduler
