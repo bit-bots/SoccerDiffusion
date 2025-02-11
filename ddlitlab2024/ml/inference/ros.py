@@ -42,8 +42,8 @@ class Inference(Node):
         )
 
         checkpoint_path = (
-            "../training/destilled_trajectory_transformer_model_first_train_20_epoch_hyp.pth"
-            # "../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
+            "../training/trajectory_transformer_model_large_distill.pth"
+            #"../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
         )
         self.inference_denosing_timesteps = 30
 
@@ -51,7 +51,7 @@ class Inference(Node):
         self.sample_rate = DEFAULT_RESAMPLE_RATE_HZ
         # Load the hyperparameters from the checkpoint
         self.get_logger().info(f"Loading checkpoint '{checkpoint_path}'")
-        checkpoint = torch.load(checkpoint_path, weights_only=True)
+        checkpoint = torch.load(checkpoint_path, weights_only=True, map_location=torch.device('cpu'))
         self.hyper_params = checkpoint["hyperparams"]
 
         # Subscribe to all the input topics
@@ -86,7 +86,7 @@ class Inference(Node):
 
         # Add default values to the buffers
         self.image_embeddings = [torch.randn(3, 480, 480)] * self.hyper_params["image_context_length"]
-        self.imu_data = [torch.randn(4)] * self.hyper_params["imu_context_length"]
+        self.imu_data = [torch.zeros(4)] * self.hyper_params["imu_context_length"]
         self.joint_state_data = [torch.randn(len(JointStates.get_ordered_joint_names()))] * self.hyper_params[
             "joint_state_context_length"
         ]
@@ -140,7 +140,7 @@ class Inference(Node):
         self.scheduler.set_timesteps(self.inference_denosing_timesteps)
 
         # Create control timer to run inference at a fixed rate
-        interval = 1 / self.sample_rate * (self.hyper_params["trajectory_prediction_length"])
+        interval = 1 / self.sample_rate * self.hyper_params["trajectory_prediction_length"]
         # We want to run the inference in a separate thread to not block the callbacks, but we also want to make sure
         # that the inference is not running multiple times in parallel
         self.create_timer(interval, self.step, callback_group=MutuallyExclusiveCallbackGroup())
@@ -235,6 +235,7 @@ class Inference(Node):
                     torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device) + 3 * np.pi
                 )
                 % (2 * np.pi),  # torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device),
+                "game_state": torch.zeros(1, dtype=torch.long).to(device),
             }
 
         print("Batch: ", batch["image_data"].shape)
@@ -248,7 +249,8 @@ class Inference(Node):
 
         ## Perform the embedding of the conditioning
         start = time.time()
-        embedded_input = self.model.encode_input_data(batch)
+        with torch.no_grad():
+            embedded_input = self.model.encode_input_data(batch)
         print("Time for embedding: ", time.time() - start)
 
         # Denoise the trajectory
@@ -273,8 +275,6 @@ class Inference(Node):
                     # Update the trajectory based on the predicted noise and the current step of the denoising process
                     trajectory = self.scheduler.step(noise_pred, t, trajectory).prev_sample
 
-        print("Time for forward: ", time.time() - start)
-
         # Undo the normalization
         trajectory = self.normalizer.denormalize(trajectory)
 
@@ -287,12 +287,14 @@ class Inference(Node):
             point = JointTrajectoryPoint()
             point.positions = trajectory[0, i].cpu().numpy() - np.pi
             point.time_from_start = Duration(nanoseconds=int(1e9 / self.sample_rate * i)).to_msg()
-            point.velocities = [3.0] * 2 + [-1.0] * (
-                len(JointStates.get_ordered_joint_names()) - 2
+            point.velocities = [-1.0] * (
+                len(JointStates.get_ordered_joint_names())
             )  # TODO remove if interpolation is added
             point.accelerations = [-1.0] * len(JointStates.get_ordered_joint_names())
             point.effort = [-1.0] * len(JointStates.get_ordered_joint_names())
             trajectory_msg.points.append(point)
+
+        print("Time for forward: ", time.time() - start)
         self.trajectory_pub.publish(trajectory_msg)
 
 
