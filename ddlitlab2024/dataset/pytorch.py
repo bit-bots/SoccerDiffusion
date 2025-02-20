@@ -256,7 +256,7 @@ class DDLITLab2024Dataset(Dataset):
             case rep:
                 raise NotImplementedError(f"Unknown IMU representation {rep}")
 
-        return torch.from_numpy(imu_data)
+        return torch.from_numpy(imu_data).float()
 
     def query_current_game_state(self, recording_id: int, stamp: float) -> torch.Tensor:
         cursor = self.db_connection.cursor()
