@@ -57,7 +57,7 @@ class ResNetImageEncoder(AbstractImageEncoder):
     ResNet image encoder.
     """
 
-    def __init__(self, resnet_type: ImageEncoderType, hidden_dim: int):
+    def __init__(self, resnet_type: ImageEncoderType, hidden_dim: int, use_final_avgpool: bool, resolution: int):
         super().__init__()
         match resnet_type:
             case ImageEncoderType.RESNET18:
@@ -66,7 +66,21 @@ class ResNetImageEncoder(AbstractImageEncoder):
                 self.encoder = resnet50(weights=ResNet50_Weights.DEFAULT)
             case _:
                 raise ValueError(f"Invalid ResNet type: {resnet_type}")
-        self.encoder.fc = nn.Linear(self.encoder.fc.in_features, hidden_dim)
+        if use_final_avgpool:
+            self.encoder.fc = nn.Linear(self.encoder.fc.in_features, hidden_dim)
+        else:
+            self.encoder.avgpool = nn.Conv2d(self.encoder.fc.in_features, 32, 1)
+            self.encoder.fc = nn.Linear(ResNetImageEncoder.calculate_output_size(resolution) ** 2 * 32, hidden_dim)
+
+    @staticmethod
+    def calculate_output_size(resolution):
+        # Initial convolutional layer
+        resolution = (resolution - 7 + 2 * 3) // 2 + 1
+        # Max pooling layer
+        resolution = (resolution - 3 + 2 * 1) // 2 + 1
+        # Residual blocks (downsampling by a factor of 2 in each stage)
+        resolution = resolution // 2 // 2 // 2
+        return resolution
 
 
 class SwinTransformerImageEncoder(AbstractImageEncoder):
@@ -107,15 +121,20 @@ class TransformerImageSequenceEncoder(nn.Module):
         return self.transformer_encoder(self.image_encoder(x))
 
 
-def image_encoder_factory(encoder_type: ImageEncoderType, hidden_dim: int) -> AbstractImageEncoder:
+def image_encoder_factory(
+    encoder_type: ImageEncoderType, hidden_dim: int, use_final_avgpool: bool, resolution: int
+) -> AbstractImageEncoder:
     """
     Factory function for creating image encoders.
 
     :param encoder_type: The type of the image encoder.
+    :param hidden_dim: The number of hidden dimensions.
+    :param use_final_avgpool: Whether to use the final average pooling layer.
+    :param resolution: The resolution of the images.
     :return: The image encoder.
     """
     if encoder_type in [ImageEncoderType.RESNET18, ImageEncoderType.RESNET50]:
-        return ResNetImageEncoder(encoder_type, hidden_dim)
+        return ResNetImageEncoder(encoder_type, hidden_dim, use_final_avgpool, resolution)
     if encoder_type in [ImageEncoderType.SWIN_TRANSFORMER_TINY, ImageEncoderType.SWIN_TRANSFORMER_SMALL]:
         return SwinTransformerImageEncoder(encoder_type, hidden_dim)
     else:
@@ -128,6 +147,8 @@ def image_sequence_encoder_factory(
     hidden_dim: int,
     num_layers: int,
     max_seq_len: int,
+    use_final_avgpool: bool,
+    resolution: int,
 ):
     """
     Factory function for creating image sequence encoders.
@@ -135,9 +156,14 @@ def image_sequence_encoder_factory(
     :param encoder_type: The type of the sequence encoder that allows communication between different images.
         If no sequence encoder is needed, the image encoder is returned.
     :param image_encoder_type: The type of the image encoder.
+    :param hidden_dim: The number of hidden dimensions.
+    :param num_layers: The number of transformer layers.
+    :param max_seq_len: The maximum sequence length.
+    :param use_final_avgpool: Whether to use the final average pooling layer.
+    :param resolution: The resolution of the images.
     :return: The image sequence encoder.
     """
-    image_encoder = image_encoder_factory(image_encoder_type, hidden_dim)
+    image_encoder = image_encoder_factory(image_encoder_type, hidden_dim, use_final_avgpool, resolution)
 
     match encoder_type:
         case SequenceEncoderType.TRANSFORMER:

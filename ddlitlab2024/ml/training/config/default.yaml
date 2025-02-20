@@ -20,6 +20,8 @@ joint_state_encoder_layers: 2
 use_images: True
 image_sequence_encoder_type: "transformer"
 image_encoder_type: "resnet18"
+image_resolution: 224
+image_use_final_avgpool: False
 num_image_sequence_encoder_layers: 1
 num_decoder_layers: 4
 distill_teacher_inference_steps: 30

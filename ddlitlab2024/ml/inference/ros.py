@@ -43,7 +43,7 @@ class Inference(Node):
 
         checkpoint_path = (
             "../training/trajectory_transformer_model_large_distill.pth"
-            #"../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
+            # "../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
         )
         self.inference_denosing_timesteps = 30
 
@@ -51,7 +51,7 @@ class Inference(Node):
         self.sample_rate = DEFAULT_RESAMPLE_RATE_HZ
         # Load the hyperparameters from the checkpoint
         self.get_logger().info(f"Loading checkpoint '{checkpoint_path}'")
-        checkpoint = torch.load(checkpoint_path, weights_only=True, map_location=torch.device('cpu'))
+        checkpoint = torch.load(checkpoint_path, weights_only=True, map_location=torch.device("cpu"))
         self.hyper_params = checkpoint["hyperparams"]
 
         # Subscribe to all the input topics
@@ -123,6 +123,8 @@ class Inference(Node):
             image_encoder_type=ImageEncoderType(self.hyper_params["image_encoder_type"]),
             num_image_sequence_encoder_layers=self.hyper_params["num_image_sequence_encoder_layers"],
             image_context_length=self.hyper_params["image_context_length"],
+            image_use_final_avgpool=self.hyper_params.get("image_use_final_avgpool", True),
+            image_resolution=self.hyper_params.get("image_resolution", 480),
             num_decoder_layers=self.hyper_params["num_decoder_layers"],
             trajectory_prediction_length=self.hyper_params["trajectory_prediction_length"],
             use_gamestate=self.hyper_params["use_gamestate"],
