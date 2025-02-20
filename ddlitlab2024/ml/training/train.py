@@ -84,11 +84,17 @@ if __name__ == "__main__":
         num_samples_joint_trajectory=params["action_context_length"],
         num_samples_imu=params["imu_context_length"],
         num_samples_joint_states=params["joint_state_context_length"],
+        imu_representation=IMUEncoder.OrientationEmbeddingMethod(
+            params["imu_orientation_embedding_method"]
+        ),
         use_action_history=params["use_action_history"],
         use_imu=params["use_imu"],
         use_joint_states=params["use_joint_states"],
         use_images=params["use_images"],
         use_game_state=params["use_gamestate"],
+        image_resolution=params.get(
+            "image_resolution", 480
+        ),  # This parameter has been added later so we need to check if it is present
     )
     num_workers = 32 if not args.decoder_pretraining else 24
     dataloader = DataLoader(
@@ -129,6 +135,8 @@ if __name__ == "__main__":
         image_encoder_type=ImageEncoderType(params["image_encoder_type"]),
         num_image_sequence_encoder_layers=params["num_image_sequence_encoder_layers"],
         image_context_length=params["image_context_length"],
+        image_use_final_avgpool=params.get("image_use_final_avgpool", True),
+        image_resolution=params.get("image_resolution", 480),
         num_decoder_layers=params["num_decoder_layers"],
         trajectory_prediction_length=params["trajectory_prediction_length"],
         use_gamestate=params["use_gamestate"],
@@ -171,7 +179,7 @@ if __name__ == "__main__":
     )
 
     # Load the learning rate scheduler state if a checkpoint is provided
-    if args.checkpoint is not None:
+    if args.checkpoint is not None and False:
         if "lr_scheduler_state_dict" in checkpoint:
             logger.info("Loading learning rate scheduler state from checkpoint")
             lr_scheduler.load_state_dict(checkpoint["lr_scheduler_state_dict"])
@@ -223,8 +231,8 @@ if __name__ == "__main__":
                 predicted_traj = model(batch, noisy_trajectory, random_timesteps)
 
             # Compute the loss
-            loss = F.mse_loss(predicted_traj, noise)    
-            
+            loss = F.mse_loss(predicted_traj, noise)
+
             if i % 20 == 0:
                 pbar.set_postfix_str(
                     f"Epoch {epoch}, Loss: {loss.item():.05f}, LR: {lr_scheduler.get_last_lr()[0]:0.7f}"
@@ -248,4 +256,3 @@ if __name__ == "__main__":
 
     # Finish the run cleanly
     run.finish()
-

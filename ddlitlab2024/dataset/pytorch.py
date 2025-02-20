@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal, Optional
 
+import cv2
 import numpy as np
 import pandas as pd
 import torch
@@ -60,6 +61,7 @@ class DDLITLab2024Dataset(Dataset):
         sampling_rate: int = 100,
         max_fps_video: int = 10,
         num_frames_video: int = 50,
+        image_resolution: int = 480,
         trajectory_stride: int = 1,
         num_joints: int = 20,
         use_images: bool = True,
@@ -80,6 +82,7 @@ class DDLITLab2024Dataset(Dataset):
         self.sampling_rate = sampling_rate
         self.max_fps_video = max_fps_video
         self.num_frames_video = num_frames_video
+        self.image_resolution = image_resolution
         self.trajectory_stride = trajectory_stride
         self.num_joints = num_joints
         self.joint_names = JointStates.get_ordered_joint_names()
@@ -167,7 +170,7 @@ class DDLITLab2024Dataset(Dataset):
         return raw_joint_data
 
     def query_image_data(
-        self, recording_id: int, end_time_stamp: float, context_len: float, num_frames: int
+        self, recording_id: int, end_time_stamp: float, context_len: float, num_frames: int, resolution: int
     ) -> tuple[torch.Tensor, torch.Tensor]:
         # Get the image data
         cursor = self.db_connection.cursor()
@@ -194,6 +197,8 @@ class DDLITLab2024Dataset(Dataset):
         for stamp, data in response:
             # Deserialize the image data
             image = np.frombuffer(data, dtype=np.uint8).reshape(480, 480, 3)
+            # Resize the image
+            image = cv2.resize(image, (resolution, resolution), interpolation=cv2.INTER_AREA)
             # Make chw from hwc
             image = np.moveaxis(image, -1, 0)
             # Append to the list
@@ -307,11 +312,17 @@ class DDLITLab2024Dataset(Dataset):
                 # so we consider it as an upper bound
                 (self.num_frames_video + 1) / self.max_fps_video,
                 self.num_frames_video,
+                self.image_resolution,
             )
             # Some sanity checks
             assert all([stamp >= image_stamp for image_stamp in image_stamps]), "The image data is not synchronized"
             assert len(image_stamps) == self.num_frames_video, "The image data is not the correct length"
-            assert image_data.shape == (self.num_frames_video, 3, 480, 480), "The image data has the wrong shape"
+            assert image_data.shape == (
+                self.num_frames_video,
+                3,
+                self.image_resolution,
+                self.image_resolution,
+            ), "The image data has the wrong shape"
             assert (
                 image_stamps[0] >= stamp - (self.num_frames_video + 1) / self.max_fps_video
             ), "The image data is not synchronized"

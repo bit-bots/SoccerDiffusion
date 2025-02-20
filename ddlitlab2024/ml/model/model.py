@@ -30,6 +30,8 @@ class End2EndDiffusionTransformer(nn.Module):
         image_sequence_encoder_type: SequenceEncoderType,
         num_image_sequence_encoder_layers: int,
         image_context_length: int,
+        image_use_final_avgpool: bool,
+        image_resolution: int,
         use_gamestate: bool,
         num_decoder_layers: int,
         trajectory_prediction_length: int,
@@ -91,6 +93,8 @@ class End2EndDiffusionTransformer(nn.Module):
                 hidden_dim=hidden_dim,
                 num_layers=num_image_sequence_encoder_layers,
                 max_seq_len=image_context_length,
+                use_final_avgpool=image_use_final_avgpool,
+                resolution=image_resolution,
             )
             if use_images
             else None
