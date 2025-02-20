@@ -208,7 +208,7 @@ class DDLITLab2024Dataset(Dataset):
         # Apply zero padding if necessary
         if len(image_data) < num_frames:
             image_data = [
-                np.zeros((3, 480, 480), dtype=np.uint8) for _ in range(num_frames - len(image_data))
+                np.zeros((3, resolution, resolution), dtype=np.uint8) for _ in range(num_frames - len(image_data))
             ] + image_data
             stamps = [end_time_stamp - context_len for _ in range(num_frames - len(stamps))] + stamps
 
