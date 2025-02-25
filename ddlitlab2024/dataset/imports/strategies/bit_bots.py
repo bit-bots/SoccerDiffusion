@@ -9,7 +9,7 @@ from mcap_ros2.decoder import DecoderFactory
 
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.converters.converter import Converter
-from ddlitlab2024.dataset.converters.game_state_converter import GameStateConverter
+from ddlitlab2024.dataset.converters.game_state_converter.bit_bots_game_state_converter import BitBotsGameStateConverter
 from ddlitlab2024.dataset.converters.image_converter import ImageConverter
 from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConverter
 from ddlitlab2024.dataset.imports.data import InputData, ModelData
@@ -32,7 +32,7 @@ class BitBotsImportStrategy(ImportStrategy):
         self,
         metadata: ImportMetadata,
         image_converter: ImageConverter,
-        game_state_converter: GameStateConverter,
+        game_state_converter: BitBotsGameStateConverter,
         synced_data_converter: SyncedDataConverter,
     ):
         self.metadata = metadata

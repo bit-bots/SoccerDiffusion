@@ -14,7 +14,8 @@ from rich.console import Console
 from ddlitlab2024 import DEFAULT_RESAMPLE_RATE_HZ, IMAGE_MAX_RESAMPLE_RATE_HZ, __version__
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.cli.args import CLIArgs, CLICommand, DBCommand, ImportType
-from ddlitlab2024.dataset.converters.game_state_converter import GameStateConverter
+from ddlitlab2024.dataset.converters.game_state_converter.b_human_game_state_converter import BHumanGameStateConverter
+from ddlitlab2024.dataset.converters.game_state_converter.bit_bots_game_state_converter import BitBotsGameStateConverter
 from ddlitlab2024.dataset.converters.image_converter import BHumanImageConverter, BitbotsImageConverter, ImageConverter
 from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConverter
 from ddlitlab2024.dataset.db import Database
@@ -74,7 +75,7 @@ def main():
                             simulated=False,
                         )
                         upper_image_converter = BitbotsImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
-                        game_state_converter = GameStateConverter(OriginalRateResampler())
+                        game_state_converter = BitBotsGameStateConverter(OriginalRateResampler())
                         synced_data_converter = SyncedDataConverter(
                             PreviousInterpolationResampler(DEFAULT_RESAMPLE_RATE_HZ)
                         )
@@ -94,7 +95,7 @@ def main():
                         )
                         upper_image_converter = BHumanImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
                         lower_image_converter = BHumanImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
-                        game_state_converter = GameStateConverter(OriginalRateResampler())
+                        game_state_converter = BHumanGameStateConverter(OriginalRateResampler())
                         synced_data_converter = SyncedDataConverter(
                             PreviousInterpolationResampler(DEFAULT_RESAMPLE_RATE_HZ)
                         )

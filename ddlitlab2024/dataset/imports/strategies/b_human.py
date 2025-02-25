@@ -1,7 +1,7 @@
 import io
 import re
 import sys
-from collections import defaultdict
+from collections import defaultdict, deque
 from collections.abc import MutableMapping
 from datetime import datetime, timedelta
 from enum import Enum
@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.converters.converter import Converter
-from ddlitlab2024.dataset.converters.game_state_converter import GameStateConverter
+from ddlitlab2024.dataset.converters.game_state_converter.b_human_game_state_converter import BHumanGameStateConverter
 from ddlitlab2024.dataset.converters.image_converter import ImageConverter
 from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConverter
 from ddlitlab2024.dataset.imports.data import InputData, ModelData
@@ -29,7 +29,6 @@ from ddlitlab2024.dataset.models import DEFAULT_IMG_SIZE, Recording
 
 class Representation(str, Enum):
     FRAME_INFO = "FrameInfo"
-    GAME_CONTROL_DATA = "GameControlData"
     GAME_STATE = "GameState"
     INERTIAL_SENSOR_DATA = "InertialSensorData"
     JOINT_SENSOR_DATA = "JointSensorData"
@@ -99,9 +98,9 @@ class SmartRecord(MutableMapping):
         return len(self.data)
 
     # Typedef for default value in get method
-    D = TypeVar("D")
+    _D = TypeVar("_D")
 
-    def get(self, key: str, default: D = None) -> SmartValue | D:
+    def get(self, key: str, default: _D = None) -> SmartValue | _D:
         return self.data.get(key, default)
 
 
@@ -111,6 +110,7 @@ class SmartFrame(MutableMapping):
             repr: SmartRecord(frame[repr]) for repr in frame.representations if repr in Representation.values()
         }
         self.thread: str = frame.thread
+        self._time: int | None = None
 
     def __getitem__(self, key: str) -> SmartRecord:
         return self.data[key]
@@ -134,7 +134,18 @@ class SmartFrame(MutableMapping):
     def from_frame(frame: Frame) -> "SmartFrame":
         return SmartFrame(frame)
 
-    def time_ms(self) -> int | None:
+    @property
+    def time(self) -> int | None:
+        return self._time
+
+    @time.setter
+    def time(self, value: int):
+        if self._time is None:
+            self._time = value
+        else:
+            raise RuntimeWarning("Time is already set!")
+
+    def scrape_time_ms(self) -> int | None:
         """Returns the zero-shifted time of the frame in milliseconds.
 
         :return: The zero-shifted time of the frame in milliseconds, if available
@@ -149,22 +160,32 @@ class SmartFrame(MutableMapping):
             if GLOBAL_TIME_OFFSET is not None and JPEG_IMAGE_DATE_OFFSET is not None:
                 return timestamp - GLOBAL_TIME_OFFSET - JPEG_IMAGE_DATE_OFFSET
 
+        # Search for times in other representations
+        times: list[int] = []
+        for representation, record in self.items():
+            if representation != Representation.JPEG_IMAGE.value:
+                if (time := record.get("time")) is not None:
+                    times.append(time)
+                if (timestamp := record.get("timestamp")) is not None:
+                    times.append(timestamp)
+
         # Case other timestamp is available
         # Shift the time using the GLOBAL_TIME_OFFSET if it is defined
-        if isinstance((time := self.get("time")), int):
+        if times:
+            assert len(set(times)) == 1, f"Frame has conflicting time definitions: {times}!"
             if GLOBAL_TIME_OFFSET is not None:
-                return time - GLOBAL_TIME_OFFSET
+                return times[0] - GLOBAL_TIME_OFFSET
 
         # If no time is available, return None
         return None
 
-    def raw_time_ms_meta(self) -> list[tuple[int, str, str]]:
+    def scrape_raw_time_ms_meta(self) -> list[tuple[int, str, str]]:
         """Returns a list of raw times contained in the frame in milliseconds since the start of the log.
         Meta data is the thread name of the frame and the representation of the frame.
 
         :return: A list of (time, thread, representation) tuples.
         """
-        times = []
+        times: list[tuple[int, str, str]] = []
         for representation, record in self.items():
             if (time := record.get("time")) is not None:
                 times.append((time, self.thread, representation))
@@ -232,7 +253,7 @@ class BHumanImportStrategy(ImportStrategy):
         metadata: ImportMetadata,
         upper_image_converter: ImageConverter,
         lower_image_converter: ImageConverter,
-        game_state_converter: GameStateConverter,
+        game_state_converter: BHumanGameStateConverter,
         synced_data_converter: SyncedDataConverter,
         caching: bool = False,
         video: bool = False,
@@ -262,26 +283,22 @@ class BHumanImportStrategy(ImportStrategy):
 
         data = InputData()
 
-        # TODO: populate team_color
-
-        for i, frame in tqdm(enumerate(frames), total=len(frames), desc="Converting frames", unit="frames"):
+        for frame in tqdm(frames, total=len(frames), desc="Converting frames", unit="frames"):
             self._show_video(frame)
 
             converter: Converter | None = None
 
-            time = frame.time_ms()
-            if time is None:
+            if frame.time is None:
                 continue
-            relative_timestamp = time / 1000.0
+            relative_timestamp: float = frame.time / 1000.0  # Timestamp relative to the beginning in seconds
 
             for representation, record in frame.items():
                 match representation:
                     case Representation.FRAME_INFO.value:
                         pass
-                    case Representation.GAME_CONTROL_DATA.value:
-                        pass
                     case Representation.GAME_STATE.value:
-                        pass
+                        data.game_state = record.data
+                        converter = self.game_state_converter
                     case Representation.INERTIAL_SENSOR_DATA.value:
                         pass
                     case Representation.JOINT_SENSOR_DATA.value:
@@ -441,7 +458,7 @@ class BHumanImportStrategy(ImportStrategy):
 
         times: list[tuple[int, int, str, str]] = []  # Frame index, time, thread, representation
         for i, frame in enumerate(frames):
-            for time, thread, representation in frame.raw_time_ms_meta():
+            for time, thread, representation in frame.scrape_raw_time_ms_meta():
                 times.append((i, time, thread, representation))
         df_times = pd.DataFrame(times, columns=["Frame Index", "Time [ms]", "Thread", "Representation"])
 
@@ -483,10 +500,25 @@ class BHumanImportStrategy(ImportStrategy):
 
         logger.info(f"Recording duration {duration.total_seconds()} [s]" f" from {start_time.isoformat()}")
 
-        # Drop frames with time_ms() == None and sort frames by time_ms() in ascending order
-        # TODO: Handle dropped frames and regenerate time somehow
-        frames = [frame for frame in frames if frame.time_ms() is not None]
-        frames.sort(key=lambda frame: frame.time_ms())  # type: ignore
+        # Handle missing times:
+        # Infer a frame's missing time from the previous times
+        repaired_frames: list[SmartFrame] = []
+        last_times: deque[int] = deque(maxlen=10)
+        for frame in frames:
+            time = frame.scrape_time_ms()
+            if time is not None:
+                last_times.append(time)
+            elif last_times:
+                time = max(last_times)
+
+            if time is not None:
+                frame.time = time
+                repaired_frames.append(frame)
+
+        del frames
+
+        # Sort frames by time_ms() in ascending order
+        repaired_frames.sort(key=lambda frame: frame.time)  # type: ignore
 
         # # Scatter plot the time of sorted frames
         # import matplotlib.pyplot as plt
@@ -497,7 +529,7 @@ class BHumanImportStrategy(ImportStrategy):
         # plt.ylabel("Time [ms]")
         # plt.title("Time of Sorted Frames")
         # plt.show()
-        return frames
+        return repaired_frames
 
     def _extract_image_resolutions(self, frames: list[SmartFrame]) -> None:
         global UPPER_IMAGE_RESOLUTION, LOWER_IMAGE_RESOLUTION
@@ -528,8 +560,10 @@ class BHumanImportStrategy(ImportStrategy):
         # Collect counts per represenation
         statistics: dict[str, Statistic] = defaultdict(Statistic)
 
+        total_key: str = "TOTAL FRAMES"
+
         # Count
-        statistics["TOTAL FRAMES"].count = len(frames)
+        statistics[total_key].count = len(frames)
         for frame in frames:
             for representation in frame.keys():
                 statistics[representation].count += 1
@@ -549,7 +583,10 @@ class BHumanImportStrategy(ImportStrategy):
             if not field.startswith("__"):  # Skip python internal stuff
                 table.add_column(field)
         for repr, statistic in statistics.items():
-            table.add_row(f"[bold]{repr}", f"{statistic.count}", f"{statistic.avg_frequency:.2f} Hz")
+            style = None
+            if repr == total_key:
+                style = "bold cyan"
+            table.add_row(f"[bold]{repr}", f"{statistic.count}", f"{statistic.avg_frequency:.2f} Hz", style=style)
 
         console = Console()
         console.print(table)
