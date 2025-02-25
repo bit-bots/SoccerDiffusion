@@ -37,7 +37,7 @@ class ImageConverter(Converter):
         return models
 
     def _create_image(self, data, sampling_timestamp: float, recording: Recording) -> Image:
-        img_array = np.frombuffer(data.data, np.uint8).reshape((data.height, data.width, 3))
+        img_array = np.frombuffer(data.data, np.uint8).reshape((data.height, data.width, -1))
 
         will_img_be_upscaled = recording.img_width_scaling > 1.0 or recording.img_height_scaling > 1.0
         interpolation = cv2.INTER_AREA
@@ -50,8 +50,16 @@ class ImageConverter(Converter):
                 resized_rgb_img = resized_img
             case "bgr8":
                 resized_rgb_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
+            case "bgra8":
+                resized_rgb_img = cv2.cvtColor(resized_img, cv2.COLOR_BGRA2RGB)
             case _:
                 raise AssertionError(f"Unsupported image encoding: {data.encoding}")
+
+        assert resized_rgb_img.shape == (
+            recording.img_height,
+            recording.img_width,
+            3,
+        ), "Converted image does not have the expected dimensions"
 
         return Image(
             stamp=sampling_timestamp,
