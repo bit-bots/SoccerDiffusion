@@ -1,6 +1,7 @@
 import io
 import re
 import sys
+from collections import defaultdict
 from collections.abc import MutableMapping
 from datetime import datetime, timedelta
 from enum import Enum
@@ -12,6 +13,8 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from pybh.logs import Array, Frame, Log, Record, Value
+from rich.console import Console
+from rich.table import Table
 from tqdm import tqdm
 
 from ddlitlab2024.dataset import logger
@@ -254,6 +257,8 @@ class BHumanImportStrategy(ImportStrategy):
         log, frames = self._read_log_file(file_path)
         frames = self._handle_timestamps(frames)
         self._extract_image_resolutions(frames)
+
+        self._statistics(frames)
 
         data = InputData()
 
@@ -509,6 +514,45 @@ class BHumanImportStrategy(ImportStrategy):
                     UPPER_IMAGE_RESOLUTION = (image.shape[1], image.shape[0])
                 elif thread == Thread.Lower.value and LOWER_IMAGE_RESOLUTION is None:
                     LOWER_IMAGE_RESOLUTION = (image.shape[1], image.shape[0])
+
+    def _statistics(self, frames: list[SmartFrame]) -> None:
+        """
+        Log some statistics about the representations of the frames.
+        For each Representation, we measure the count and average frequency.
+        """
+
+        class Statistic:
+            count: int = 0
+            avg_frequency: float | None = None
+
+        # Collect counts per represenation
+        statistics: dict[str, Statistic] = defaultdict(Statistic)
+
+        # Count
+        statistics["TOTAL FRAMES"].count = len(frames)
+        for frame in frames:
+            for representation in frame.keys():
+                statistics[representation].count += 1
+
+        # Average frequency
+        if (recording := self.model_data.recording) is not None and (duration := recording.duration()) is not None:
+            for statistic in statistics.values():
+                try:
+                    statistic.avg_frequency = 1 / (duration / statistic.count).total_seconds()
+                except ZeroDivisionError:
+                    pass
+
+        # Output the statistics
+        table = Table(title=f"Frame Statistics ({len(statistics)-1} Representations)")
+        table.add_column("Representation", justify="right", no_wrap=True)
+        for field in vars(Statistic):
+            if not field.startswith("__"):  # Skip python internal stuff
+                table.add_column(field)
+        for repr, statistic in statistics.items():
+            table.add_row(f"[bold]{repr}", f"{statistic.count}", f"{statistic.avg_frequency:.2f} Hz")
+
+        console = Console()
+        console.print(table)
 
     def _show_video(self, frame: SmartFrame) -> None:
         if self.video and (img := frame.image()) is not None:
