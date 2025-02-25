@@ -304,11 +304,11 @@ class BHumanImportStrategy(ImportStrategy):
                     case _:
                         logger.error(f"Unknown representation: {representation}")
 
-            if converter is not None:
-                assert self.model_data.recording is not None, "Recording must be defined to create child models"
-                converter.populate_recording_metadata(data, self.model_data.recording)
-                model_data = converter.convert_to_model(data, relative_timestamp, self.model_data.recording)
-                self.model_data = self.model_data.merge(model_data)
+                if converter is not None:
+                    assert self.model_data.recording is not None, "Recording must be defined to create child models"
+                    converter.populate_recording_metadata(data, self.model_data.recording)
+                    model_data = converter.convert_to_model(data, relative_timestamp, self.model_data.recording)
+                    self.model_data = self.model_data.merge(model_data)
 
         return self.model_data
 
@@ -473,10 +473,10 @@ class BHumanImportStrategy(ImportStrategy):
         self.model_data.recording.start_time = start_time
         self.model_data.recording.end_time = end_time
 
-        logger.info(
-            f"Recording duration {self.model_data.recording.duration().total_seconds()} [s]"
-            f" from {start_time.isoformat()}"
-        )
+        duration = self.model_data.recording.duration()
+        assert duration is not None, "Recording must have an duration as we just set the start_ and end_time!"
+
+        logger.info(f"Recording duration {duration.total_seconds()} [s]" f" from {start_time.isoformat()}")
 
         # Drop frames with time_ms() == None and sort frames by time_ms() in ascending order
         # TODO: Handle dropped frames and regenerate time somehow
