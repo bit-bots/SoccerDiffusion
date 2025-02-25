@@ -1,10 +1,12 @@
+import argparse
 from dataclasses import asdict
+from functools import partial
 
 import numpy as np
 import torch
 import torch.nn.functional as F  # noqa
+import yaml
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
-from ema_pytorch import EMA
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -17,40 +19,68 @@ from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# Fix tqdm when the terminal width changes, this is for some reason not a default, therfore we make it one
+tqdm = partial(tqdm, dynamic_ncols=True)
 
 if __name__ == "__main__":
     logger.info("Starting training")
     logger.info(f"Using device {device}")
     # TODO wandb
-    # Define hyperparameters # TODO proper configuration
-    hidden_dim = 256
-    num_layers = 4
-    num_heads = 4
-    action_context_length = 100
-    trajectory_prediction_length = 10
-    epochs = 4
-    batch_size = 16
-    lr = 1e-4
-    train_denoising_timesteps = 1000
-    image_context_length = 10
-    action_context_length = 100
-    imu_context_length = 100
-    joint_state_context_length = 100
-    num_normalization_samples = 50
+
+    # Parse the command line arguments
+    parser = argparse.ArgumentParser(description="Train the model")
+    parser.add_argument("--config", "-c", type=str, default=None, help="Path to the configuration file")
+    parser.add_argument("--checkpoint", "-p", type=str, default=None, help="Path to the checkpoint to load")
+    parser.add_argument(
+        "--output", "-o", type=str, default="trajectory_transformer_model.pth", help="Path to save the model"
+    )
+    args = parser.parse_args()
+
+    assert (
+        args.config is not None or args.checkpoint is not None
+    ), "Either a configuration file or a checkpoint must be provided"
+
+    # Load the hyperparameters from the checkpoint
+    if args.checkpoint is not None:
+        logger.info(f"Loading checkpoint '{args.checkpoint}'")
+        checkpoint = torch.load(args.checkpoint, weights_only=True)
+        params = checkpoint["hyperparams"]
+
+    # Load the hyperparameters from the configuration file
+    if args.config is not None:
+        logger.info(f"Loading configuration file '{args.config}'")
+        with open(args.config) as file:
+            config_params = yaml.safe_load(file)
+
+        if args.checkpoint is not None:
+            logger.warning(
+                "Both a configuration file and a checkpoint are provided. "
+                "The configuration file will be used for the hyperparameters."
+            )
+            # Print the differences between the checkpoint and the configuration file
+            for key, value in config_params.items():
+                if key not in params:
+                    logger.warning(f"Key '{key}' is not present in the checkpoint")
+                elif value != params[key]:
+                    logger.warning(f"Key '{key}' has a different value in the checkpoint: {params[key]} != {value}")
+
+        # Now we are ready to use the configuration file
+        params = config_params
 
     # Load the dataset
     logger.info("Create dataset objects")
     dataset = DDLITLab2024Dataset(
-        num_frames_video=image_context_length,
-        num_samples_joint_trajectory_future=trajectory_prediction_length,
-        num_samples_joint_trajectory=action_context_length,
-        num_samples_imu=imu_context_length,
-        num_samples_joint_states=joint_state_context_length,
+        num_joints=params["num_joints"],
+        num_frames_video=params["image_context_length"],
+        num_samples_joint_trajectory_future=params["trajectory_prediction_length"],
+        num_samples_joint_trajectory=params["action_context_length"],
+        num_samples_imu=params["imu_context_length"],
+        num_samples_joint_states=params["joint_state_context_length"],
     )
     num_workers = 5
     dataloader = DataLoader(
         dataset,
-        batch_size=batch_size,
+        batch_size=params["batch_size"],
         shuffle=True,
         collate_fn=DDLITLab2024Dataset.collate_fn,
         persistent_workers=num_workers > 1,
@@ -61,51 +91,75 @@ if __name__ == "__main__":
 
     # Get some samples to estimate the mean and std
     logger.info("Estimating normalization parameters")
-    random_indices = np.random.randint(0, len(dataset), (num_normalization_samples,))
+    random_indices = np.random.randint(0, len(dataset), (params["num_normalization_samples"],))
     normalization_samples = torch.cat([dataset[i].joint_command_history for i in tqdm(random_indices)], dim=0)
     normalizer = Normalizer.fit(normalization_samples.to(device))
 
     # Initialize the Transformer model and optimizer, and move model to device
-    model = End2EndDiffusionTransformer(  # TODO enforce all params to be consistent with the dataset
-        num_joints=dataset.num_joints,
-        hidden_dim=hidden_dim,
-        use_action_history=True,
-        num_action_history_encoder_layers=2,
-        max_action_context_length=action_context_length,
-        use_imu=True,
-        imu_orientation_embedding_method=IMUEncoder.OrientationEmbeddingMethod.QUATERNION,
-        num_imu_encoder_layers=2,
-        max_imu_context_length=imu_context_length,
-        use_joint_states=True,
-        joint_state_encoder_layers=2,
-        max_joint_state_context_length=joint_state_context_length,
-        use_images=True,
-        image_sequence_encoder_type=SequenceEncoderType.TRANSFORMER,
-        image_encoder_type=ImageEncoderType.RESNET18,
-        num_image_sequence_encoder_layers=1,
-        max_image_context_length=image_context_length,
-        num_decoder_layers=4,
-        trajectory_prediction_length=trajectory_prediction_length,
+    model = End2EndDiffusionTransformer(
+        num_joints=params["num_joints"],
+        hidden_dim=params["hidden_dim"],
+        use_action_history=params["use_action_history"],
+        num_action_history_encoder_layers=params["num_action_history_encoder_layers"],
+        max_action_context_length=params["action_context_length"],
+        use_imu=params["use_imu"],
+        imu_orientation_embedding_method=IMUEncoder.OrientationEmbeddingMethod(
+            params["imu_orientation_embedding_method"]
+        ),
+        num_imu_encoder_layers=params["num_imu_encoder_layers"],
+        imu_context_length=params["imu_context_length"],
+        use_joint_states=params["use_joint_states"],
+        joint_state_encoder_layers=params["joint_state_encoder_layers"],
+        joint_state_context_length=params["joint_state_context_length"],
+        use_images=params["use_images"],
+        image_sequence_encoder_type=SequenceEncoderType(params["image_sequence_encoder_type"]),
+        image_encoder_type=ImageEncoderType(params["image_encoder_type"]),
+        num_image_sequence_encoder_layers=params["num_image_sequence_encoder_layers"],
+        image_context_length=params["image_context_length"],
+        num_decoder_layers=params["num_decoder_layers"],
+        trajectory_prediction_length=params["trajectory_prediction_length"],
     ).to(device)
 
     # Add normalization parameters to the model
     model.mean = normalizer.mean
     model.std = normalizer.std
+    logger.info(f"Normalization values:\nJoint mean: {normalizer.mean}\nJoint std: {normalizer.std}")
     assert all(model.std != 0), "Normalization std is zero, this makes no sense. Some joints are constant."
 
-    # Utilize an Exponential Moving Average (EMA) for the model to smooth out the training process
-    ema = EMA(model, beta=0.9999)
+    # Load the model if a checkpoint is provided
+    if args.checkpoint is not None:
+        logger.info("Loading model from checkpoint")
+        model.load_state_dict(checkpoint["model_state_dict"])
 
     # Create optimizer and learning rate scheduler
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
-    lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, total_steps=epochs * len(dataloader))
+    optimizer = torch.optim.AdamW(model.parameters(), lr=params["lr"])
+
+    # Load the optimizer state if a checkpoint is provided
+    if args.checkpoint is not None:
+        if "optimizer_state_dict" in checkpoint:
+            logger.info("Loading optimizer state from checkpoint")
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        else:
+            logger.warning("No optimizer state found in the checkpoint")
+
+    lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer, max_lr=params["lr"], total_steps=params["epochs"] * len(dataloader)
+    )
+
+    # Load the learning rate scheduler state if a checkpoint is provided
+    if args.checkpoint is not None:
+        if "lr_scheduler_state_dict" in checkpoint:
+            logger.info("Loading learning rate scheduler state from checkpoint")
+            lr_scheduler.load_state_dict(checkpoint["lr_scheduler_state_dict"])
+        else:
+            logger.warning("No learning rate scheduler state found in the checkpoint")
 
     # Create diffusion noise scheduler
     scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2", clip_sample=False)
-    scheduler.config["num_train_timesteps"] = train_denoising_timesteps
+    scheduler.config["num_train_timesteps"] = params["train_denoising_timesteps"]
 
     # Training loop
-    for epoch in range(epochs):
+    for epoch in range(params["epochs"]):
         mean_loss = 0
 
         # Iterate over the dataset
@@ -145,11 +199,17 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
-            ema.update()
 
             pbar.set_postfix_str(
-                f"Epoch {epoch}, Loss: {mean_loss / (i + 1):.05f}, LR: {lr_scheduler.get_last_lr()[0]:0.5f}"
+                f"Epoch {epoch}, Loss: {mean_loss / (i + 1):.05f}, LR: {lr_scheduler.get_last_lr()[0]:0.7f}"
             )
 
-    # Save the model
-    torch.save(ema.state_dict(), "trajectory_transformer_model.pth")
+        # Save the model
+        checkpoint = {
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "lr_scheduler_state_dict": lr_scheduler.state_dict(),
+            "hyperparams": params,
+            "current_epoch": epoch,
+        }
+        torch.save(checkpoint, args.output)
