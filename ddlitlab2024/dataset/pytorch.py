@@ -12,6 +12,7 @@ import pandas as pd
 import torch
 from tabulate import tabulate
 from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
 
 from ddlitlab2024 import DB_PATH
 from ddlitlab2024.dataset import logger
@@ -213,7 +214,14 @@ class DDLITLab2024Dataset(Dataset):
             stamps = [end_time_stamp - context_len for _ in range(num_frames - len(stamps))] + stamps
 
         # Convert to tensor
-        image_data = torch.from_numpy(np.stack(image_data, axis=0)).float()
+        preprocessing = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+            ]
+        )
+
+        image_data = preprocessing(np.stack(image_data, axis=0))
         stamps = torch.tensor(stamps)
 
         return stamps, image_data
