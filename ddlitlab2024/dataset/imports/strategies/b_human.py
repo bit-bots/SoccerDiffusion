@@ -34,8 +34,6 @@ class Representation(str, Enum):
     JOINT_SENSOR_DATA = "JointSensorData"
     JPEG_IMAGE = "JPEGImage"
     MOTION_REQUEST = "MotionRequest"
-    ROBOT_POSE = "RobotPose"
-    STRATEGY_STATUS = "StrategyStatus"
 
     @classmethod
     def values(cls) -> list[str]:
@@ -295,7 +293,7 @@ class BHumanImportStrategy(ImportStrategy):
             for representation, record in frame.items():
                 match representation:
                     case Representation.FRAME_INFO.value:
-                        pass
+                        pass  # FRAME_INFO provides no valuable information here
                     case Representation.GAME_STATE.value:
                         data.game_state = record.data
                         converter = self.game_state_converter
@@ -318,10 +316,6 @@ class BHumanImportStrategy(ImportStrategy):
                                     logger.error(f"Unknown image thread: {thread}")
                                     continue
                     case Representation.MOTION_REQUEST.value:
-                        pass
-                    case Representation.ROBOT_POSE.value:
-                        pass
-                    case Representation.STRATEGY_STATUS.value:
                         pass
                     case _:
                         logger.error(f"Unknown representation: {representation}")
