@@ -6,6 +6,7 @@ from collections.abc import MutableMapping
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TypeAlias, TypeVar
 
 import cv2
@@ -16,6 +17,7 @@ from pybh.logs import Array, Frame, Log, Record, Value
 from rich.console import Console
 from rich.table import Table
 from tqdm import tqdm
+from transforms3d.euler import euler2quat
 
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.converters.converter import Converter
@@ -96,9 +98,9 @@ class SmartRecord(MutableMapping):
         return len(self.data)
 
     # Typedef for default value in get method
-    _D = TypeVar("_D")
+    T_default = TypeVar("T_default")
 
-    def get(self, key: str, default: _D = None) -> SmartValue | _D:
+    def get(self, key: str, default: T_default = None) -> SmartValue | T_default:
         return self.data.get(key, default)
 
 
@@ -298,7 +300,18 @@ class BHumanImportStrategy(ImportStrategy):
                         data.game_state = record.data
                         converter = self.game_state_converter
                     case Representation.INERTIAL_SENSOR_DATA.value:
-                        pass
+                        try:
+                            w, x, y, z = euler2quat(
+                                record.data["angle"]["x"],
+                                record.data["angle"]["y"],
+                                record.data["angle"]["z"],  # Is always 0.0
+                                "sxyz",  # TODO: Verify this assumption
+                            )
+                        except KeyError as e:
+                            logger.error("Could not get rotation data!", exc_info=e)
+                            continue
+                        data.rotation = SimpleNamespace(x=x, y=y, z=z, w=w)
+                        converter = self.synced_data_converter
                     case Representation.JOINT_SENSOR_DATA.value:
                         pass
                     case Representation.JPEG_IMAGE.value:
