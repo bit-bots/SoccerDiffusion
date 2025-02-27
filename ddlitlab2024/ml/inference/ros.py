@@ -253,10 +253,10 @@ class Inference(Node):
                     IMUEncoder.OrientationEmbeddingMethod(self.hyper_params["imu_orientation_embedding_method"])
                     == IMUEncoder.OrientationEmbeddingMethod.FIVE_DIM
                 ):
-                    quat = quats_to_5d(np.array([quat]))[0]
+                    r5d = quats_to_5d(np.array([quat]))[0]
 
                 # Store imu data as np array in the buffer
-                self.imu_data.append(torch.tensor(quat))
+                self.imu_data.append(torch.tensor(r5d))
 
             # Remove the oldest data from the buffers
             self.joint_state_data = self.joint_state_data[-self.hyper_params["joint_state_context_length"] :]
@@ -292,10 +292,8 @@ class Inference(Node):
         start_ros_time = self.get_clock().now()
 
         ## Perform the embedding of the conditioning
-        start = time.time()
         with torch.no_grad():
             embedded_input = self.model.encode_input_data(batch)
-        print("Time for embedding: ", time.time() - start)
 
         # Denoise the trajectory
         start = time.time()
