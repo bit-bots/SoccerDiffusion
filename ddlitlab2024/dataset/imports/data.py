@@ -40,7 +40,9 @@ class InputData:
     r_shoulder_roll_command: Any = None
     l_shoulder_roll_command: Any = None
     r_elbow_command: Any = None
+    r_elbow_yaw_command: Any = 0.0  # Default
     l_elbow_command: Any = None
+    l_elbow_yaw_command: Any = 0.0  # Default
     r_hip_yaw_command: Any = None
     l_hip_yaw_command: Any = None
     r_hip_roll_command: Any = None
@@ -64,7 +66,9 @@ class InputData:
             "r_shoulder_roll": self.r_shoulder_roll_command,
             "l_shoulder_roll": self.l_shoulder_roll_command,
             "r_elbow": self.r_elbow_command,
+            "r_elbow_yaw": self.r_elbow_yaw_command,
             "l_elbow": self.l_elbow_command,
+            "l_elbow_yaw": self.l_elbow_yaw_command,
             "r_hip_yaw": self.r_hip_yaw_command,
             "l_hip_yaw": self.l_hip_yaw_command,
             "r_hip_roll": self.r_hip_roll_command,
