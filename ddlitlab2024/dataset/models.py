@@ -226,6 +226,7 @@ class JointStates(Base):
             JointStates.l_ankle_pitch.name,
             JointStates.l_ankle_roll.name,
             JointStates.l_elbow.name,
+            JointStates.l_elbow_yaw.name,
             JointStates.l_hip_pitch.name,
             JointStates.l_hip_roll.name,
             JointStates.l_hip_yaw.name,
@@ -235,13 +236,13 @@ class JointStates(Base):
             JointStates.r_ankle_pitch.name,
             JointStates.r_ankle_roll.name,
             JointStates.r_elbow.name,
+            JointStates.r_elbow_yaw.name,
             JointStates.r_hip_pitch.name,
             JointStates.r_hip_roll.name,
             JointStates.r_hip_yaw.name,
             JointStates.r_knee.name,
             JointStates.r_shoulder_pitch.name,
             JointStates.r_shoulder_roll.name,
-            # TODO add new NAO joints
         ]
 
 
