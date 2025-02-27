@@ -1,7 +1,7 @@
 import io
 import re
 import sys
-from collections import defaultdict, deque
+from collections import defaultdict
 from collections.abc import MutableMapping
 from datetime import datetime, timedelta
 from enum import Enum
@@ -503,17 +503,15 @@ class BHumanImportStrategy(ImportStrategy):
         # Handle missing times:
         # Infer a frame's missing time from the previous times
         repaired_frames: list[SmartFrame] = []
-        last_times: deque[int] = deque(maxlen=10)
+        max_time: int = 0
         for frame in frames:
             time = frame.scrape_time_ms()
-            if time is not None:
-                last_times.append(time)
-            elif last_times:
-                time = max(last_times)
-
-            if time is not None:
-                frame.time = time
-                repaired_frames.append(frame)
+            if time is None:
+                time = max_time
+            elif time > max_time:
+                max_time = time
+            frame.time = time
+            repaired_frames.append(frame)
 
         del frames
 
