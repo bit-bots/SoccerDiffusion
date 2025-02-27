@@ -3,7 +3,7 @@ from enum import Enum, auto
 from ddlitlab2024.dataset import logger
 from ddlitlab2024.dataset.converters.converter import Converter
 from ddlitlab2024.dataset.imports.data import InputData, ModelData
-from ddlitlab2024.dataset.models import GameState, Recording, RobotState
+from ddlitlab2024.dataset.models import GameState, Recording, RobotState, TeamColor
 from ddlitlab2024.dataset.resampling.original_rate_resampler import OriginalRateResampler
 
 
@@ -128,7 +128,10 @@ class BHumanGameStateConverter(Converter):
         self.resampler = resampler
 
     def populate_recording_metadata(self, data, recording: Recording):
-        team_color = data.game_state["ownTeam"]["fieldPlayerColor"]
+        # B-Human uses an TeamColor-Enum with the same ordering as we do.
+        # They use an int-Enum, but we have a str-enum and expect a string.
+        # That's why we use the int as an index to the TeamColor str-enum.
+        team_color = list(TeamColor)[data.game_state["ownTeam"]["fieldPlayerColor"]].value
 
         if recording.team_color is None:
             recording.team_color = team_color

@@ -110,4 +110,5 @@ class ModelData:
         self.joint_states.extend(other.joint_states)
         self.joint_commands.extend(other.joint_commands)
         self.images.extend(other.images)
+        self.rotations.extend(other.rotations)
         return self
