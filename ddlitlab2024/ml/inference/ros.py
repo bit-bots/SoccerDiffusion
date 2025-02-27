@@ -18,7 +18,7 @@ from rclpy.duration import Duration
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.time import Time
-from sensor_msgs.msg import Image, JointState
+from sensor_msgs.msg import Image, JointState, Imu
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from ddlitlab2024 import DEFAULT_RESAMPLE_RATE_HZ
@@ -27,6 +27,8 @@ from ddlitlab2024.dataset.pytorch import Normalizer
 from ddlitlab2024.ml.model import End2EndDiffusionTransformer
 from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
+
+from ddlitlab2024.utils.utils import quats_to_5d
 
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -41,8 +43,9 @@ class Inference(Node):
             [rclpy.parameter.Parameter("use_sim_time", rclpy.Parameter.Type.BOOL, True)],
         )
 
+        self.reconstruct_imu = False
         checkpoint_path = (
-            "../training/trajectory_transformer_model_large_distill.pth"
+            "../training/trajectory_transformer_model_sim_low_res_512_distill.pth"
             # "../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
         )
         self.inference_denosing_timesteps = 30
@@ -61,6 +64,7 @@ class Inference(Node):
         self.motor_command_sub = self.create_subscription(
             JointCommand, "/DynamixelController/command", self.motor_command_callback, 10
         )
+        self.imu_sub = self.create_subscription(JointState, "/imu/data", self.imu_callback, 10)
 
         # Publisher for the output topic
         # self.joint_state_pub = self.create_publisher(JointCommand, "/DynamixelController/command", 10)
@@ -71,6 +75,7 @@ class Inference(Node):
         self.image_embeddings = []
 
         # IMU buffer
+        self.latest_imu: Optional[Imu] = None
         self.imu_data = []
 
         # Joint state buffer
@@ -85,12 +90,23 @@ class Inference(Node):
         self.latest_game_state = None
 
         # Add default values to the buffers
-        self.image_embeddings = [torch.randn(3, 480, 480)] * self.hyper_params["image_context_length"]
-        self.imu_data = [torch.zeros(4)] * self.hyper_params["imu_context_length"]
-        self.joint_state_data = [torch.randn(len(JointStates.get_ordered_joint_names()))] * self.hyper_params[
+        self.image_embeddings = [
+            torch.zeros(
+                3, self.hyper_params.get("image_resolution", 480), self.hyper_params.get("image_resolution", 480)
+            )
+        ] * self.hyper_params["image_context_length"]
+        self.imu_data = [
+            torch.zeros(
+                5
+                if IMUEncoder.OrientationEmbeddingMethod(self.hyper_params["imu_orientation_embedding_method"])
+                == IMUEncoder.OrientationEmbeddingMethod.FIVE_DIM
+                else 4
+            )
+        ] * self.hyper_params["imu_context_length"]
+        self.joint_state_data = [torch.zeros(len(JointStates.get_ordered_joint_names()))] * self.hyper_params[
             "joint_state_context_length"
         ]
-        self.joint_command_data = [torch.randn(self.hyper_params["num_joints"])] * self.hyper_params[
+        self.joint_command_data = [torch.zeros(self.hyper_params["num_joints"])] * self.hyper_params[
             "action_context_length"
         ]
 
@@ -161,6 +177,9 @@ class Inference(Node):
     def motor_command_callback(self, msg: JointCommand):
         self.latest_motor_command = msg
 
+    def imu_callback(self, msg: JointState):
+        self.latest_imu = msg
+
     def update_buffers(self):
         with self.data_lock:
             # First we want to fill the buffers
@@ -190,7 +209,7 @@ class Inference(Node):
                 img = self.cv_bridge.imgmsg_to_cv2(self.latest_image, desired_encoding="rgb8")
 
                 # Resize the image
-                img = cv2.resize(img, (480, 480))
+                img = cv2.resize(img, [self.hyper_params.get("image_resolution", 480)] * 2)
 
                 # Make chw from hwc
                 img = np.moveaxis(img, -1, 0)
@@ -200,21 +219,44 @@ class Inference(Node):
 
                 self.image_embeddings.append(img)
 
-            # Due to a bug in the recordings of the bit-bots we can not use the imu data directly,
-            # but instead need to derive it from the tf tree
-            imu_transform = self.tf_buffer.lookup_transform("base_footprint", "base_link", Time())
+            if self.reconstruct_imu:
+                # Due to a bug in the recordings of the bit-bots we can not use the imu data directly,
+                # but instead need to derive it from the tf tree
+                imu_transform = self.tf_buffer.lookup_transform("base_footprint", "base_link", Time())
+                quat = [
+                    imu_transform.transform.rotation.x,
+                    imu_transform.transform.rotation.y,
+                    imu_transform.transform.rotation.z,
+                    imu_transform.transform.rotation.w,
+                ]
 
-            # Store imu data as np array in the form wxyz
-            self.imu_data.append(
-                torch.tensor(
-                    [
-                        imu_transform.transform.rotation.x,
-                        imu_transform.transform.rotation.y,
-                        imu_transform.transform.rotation.z,
-                        imu_transform.transform.rotation.w,
-                    ]
-                )
-            )
+                # Convert the quaternion to a 5D representation if needed
+                if (
+                    IMUEncoder.OrientationEmbeddingMethod(self.hyper_params["imu_orientation_embedding_method"])
+                    == IMUEncoder.OrientationEmbeddingMethod.FIVE_DIM
+                ):
+                    quat = quats_to_5d(np.array(quat))
+
+                # Store imu data as np array in the buffer
+                self.imu_data.append(torch.tensor(quat))
+            elif self.latest_imu is not None:
+                imu_transform = self.latest_imu
+                quat = [
+                    imu_transform.orientation.x,
+                    imu_transform.orientation.y,
+                    imu_transform.orientation.z,
+                    imu_transform.orientation.w,
+                ]
+
+                # Convert the quaternion to a 5D representation if needed
+                if (
+                    IMUEncoder.OrientationEmbeddingMethod(self.hyper_params["imu_orientation_embedding_method"])
+                    == IMUEncoder.OrientationEmbeddingMethod.FIVE_DIM
+                ):
+                    quat = quats_to_5d(np.array([quat]))[0]
+
+                # Store imu data as np array in the buffer
+                self.imu_data.append(torch.tensor(quat))
 
             # Remove the oldest data from the buffers
             self.joint_state_data = self.joint_state_data[-self.hyper_params["joint_state_context_length"] :]
@@ -289,9 +331,7 @@ class Inference(Node):
             point = JointTrajectoryPoint()
             point.positions = trajectory[0, i].cpu().numpy() - np.pi
             point.time_from_start = Duration(nanoseconds=int(1e9 / self.sample_rate * i)).to_msg()
-            point.velocities = [-1.0] * (
-                len(JointStates.get_ordered_joint_names())
-            )  # TODO remove if interpolation is added
+            point.velocities = [-1.0] * (len(JointStates.get_ordered_joint_names()))
             point.accelerations = [-1.0] * len(JointStates.get_ordered_joint_names())
             point.effort = [-1.0] * len(JointStates.get_ordered_joint_names())
             trajectory_msg.points.append(point)
