@@ -12,7 +12,7 @@ import pandas as pd
 import torch
 from tabulate import tabulate
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
+from torchvision.transforms import v2
 
 from ddlitlab2024 import DB_PATH
 from ddlitlab2024.dataset import logger
@@ -194,14 +194,23 @@ class DDLITLab2024Dataset(Dataset):
         stamps = []
         image_data = []
 
+        # Define the preprocessing pipeline
+        preprocessing = v2.Compose(
+            [
+                v2.ToImage(),
+                v2.ToDtype(torch.float32, scale=True),
+                v2.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+            ]
+        )
+
         # Get the raw image data
         for stamp, data in response:
             # Deserialize the image data
             image = np.frombuffer(data, dtype=np.uint8).reshape(480, 480, 3)
             # Resize the image
             image = cv2.resize(image, (resolution, resolution), interpolation=cv2.INTER_AREA)
-            # Make chw from hwc
-            image = np.moveaxis(image, -1, 0)
+            # Apply the preprocessing pipeline
+            image = preprocessing(image)
             # Append to the list
             image_data.append(image)
             stamps.append(stamp)
@@ -209,19 +218,12 @@ class DDLITLab2024Dataset(Dataset):
         # Apply zero padding if necessary
         if len(image_data) < num_frames:
             image_data = [
-                np.zeros((3, resolution, resolution), dtype=np.uint8) for _ in range(num_frames - len(image_data))
+                torch.zeros((3, resolution, resolution), dtype=torch.float32)
+                for _ in range(num_frames - len(image_data))
             ] + image_data
             stamps = [end_time_stamp - context_len for _ in range(num_frames - len(stamps))] + stamps
 
-        # Convert to tensor
-        preprocessing = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-            ]
-        )
-
-        image_data = preprocessing(np.stack(image_data, axis=0))
+        image_data = torch.stack(image_data, axis=0)
         stamps = torch.tensor(stamps)
 
         return stamps, image_data
