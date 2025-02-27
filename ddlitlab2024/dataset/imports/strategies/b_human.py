@@ -27,16 +27,15 @@ from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConv
 from ddlitlab2024.dataset.imports.data import InputData, ModelData
 from ddlitlab2024.dataset.imports.model_importer import ImportMetadata, ImportStrategy
 from ddlitlab2024.dataset.models import DEFAULT_IMG_SIZE, Recording
-from ddlitlab2024.utils.utils import camelcase_to_snakecase
 
 
 class Representation(str, Enum):
     FRAME_INFO = "FrameInfo"
     GAME_STATE = "GameState"
     INERTIAL_SENSOR_DATA = "InertialSensorData"
+    JOINT_REQUEST = "JointRequest"
     JOINT_SENSOR_DATA = "JointSensorData"
     JPEG_IMAGE = "JPEGImage"
-    MOTION_REQUEST = "MotionRequest"
 
     @classmethod
     def values(cls) -> list[str]:
@@ -312,11 +311,64 @@ class BHumanImportStrategy(ImportStrategy):
                             logger.error("Could not get rotation data!", exc_info=e)
                             continue
                         data.rotation = SimpleNamespace(x=x, y=y, z=z, w=w)
-                        # converter = self.synced_data_converter
+                        converter = self.synced_data_converter
+                    case Representation.JOINT_REQUEST.value:
+                        try:
+                            data.r_shoulder_pitch_command = record.data["angles"]["rShoulderPitch"]
+                            data.l_shoulder_pitch_command = record.data["angles"]["lShoulderPitch"]
+                            data.r_shoulder_roll_command = record.data["angles"]["rShoulderRoll"]
+                            data.l_shoulder_roll_command = record.data["angles"]["lShoulderRoll"]
+                            data.r_elbow_command = record.data["angles"]["rElbowRoll"]
+                            data.r_elbow_yaw_command = record.data["angles"]["rElbowYaw"]
+                            data.l_elbow_command = record.data["angles"]["lElbowRoll"]
+                            data.l_elbow_yaw_command = record.data["angles"]["lElbowYaw"]
+                            # Joint is a combination of both Yaw and Pitch.
+                            # Left and right are controlled by a single actuator.
+                            # Left has priority.
+                            # See http://doc.aldebaran.com/2-8/family/nao_technical/joints_naov6.html#naov6-joints-pelvis-joints
+                            data.r_hip_yaw_command = record.data["angles"]["rHipYawPitch"]
+                            data.l_hip_yaw_command = record.data["angles"]["lHipYawPitch"]
+                            data.r_hip_roll_command = record.data["angles"]["rHipRoll"]
+                            data.l_hip_roll_command = record.data["angles"]["lHipRoll"]
+                            data.r_hip_pitch_command = record.data["angles"]["rHipPitch"]
+                            data.l_hip_pitch_command = record.data["angles"]["lHipPitch"]
+                            data.r_knee_command = record.data["angles"]["rKneePitch"]
+                            data.l_knee_command = record.data["angles"]["lKneePitch"]
+                            data.r_ankle_pitch_command = record.data["angles"]["rAnklePitch"]
+                            data.l_ankle_pitch_command = record.data["angles"]["lAnklePitch"]
+                            data.r_ankle_roll_command = record.data["angles"]["rAnkleRoll"]
+                            data.l_ankle_roll_command = record.data["angles"]["lAnkleRoll"]
+                            data.head_pan_command = record.data["angles"]["headYaw"]
+                            data.head_tilt_command = record.data["angles"]["headPitch"]
+                        except KeyError as e:
+                            logger.error("Could not get joint command data!", exc_info=e)
+                            continue
+                        converter = self.synced_data_converter
                     case Representation.JOINT_SENSOR_DATA.value:
                         try:
                             joint_states: dict[str, float] = {
-                                camelcase_to_snakecase(joint): angle for joint, angle in record.data["angles"]
+                                "r_shoulder_pitch": record.data["angles"]["rShoulderPitch"],
+                                "l_shoulder_pitch": record.data["angles"]["lShoulderPitch"],
+                                "r_shoulder_roll": record.data["angles"]["rShoulderRoll"],
+                                "l_shoulder_roll": record.data["angles"]["lShoulderRoll"],
+                                "r_elbow": record.data["angles"]["rElbowRoll"],
+                                "r_elbow_yaw": record.data["angles"]["rElbowYaw"],
+                                "l_elbow": record.data["angles"]["lElbowRoll"],
+                                "l_elbow_yaw": record.data["angles"]["lElbowYaw"],
+                                "r_hip_yaw": record.data["angles"]["rHipYawPitch"],
+                                "l_hip_yaw": record.data["angles"]["lHipYawPitch"],
+                                "r_hip_roll": record.data["angles"]["rHipRoll"],
+                                "l_hip_roll": record.data["angles"]["lHipRoll"],
+                                "r_hip_pitch": record.data["angles"]["rHipPitch"],
+                                "l_hip_pitch": record.data["angles"]["lHipPitch"],
+                                "r_knee": record.data["angles"]["rKneePitch"],
+                                "l_knee": record.data["angles"]["lKneePitch"],
+                                "r_ankle_pitch": record.data["angles"]["rAnklePitch"],
+                                "l_ankle_pitch": record.data["angles"]["lAnklePitch"],
+                                "r_ankle_roll": record.data["angles"]["rAnkleRoll"],
+                                "l_ankle_roll": record.data["angles"]["lAnkleRoll"],
+                                "head_pan": record.data["angles"]["headYaw"],
+                                "head_tilt": record.data["angles"]["headPitch"],
                             }
                         except KeyError as e:
                             logger.error("Could not get joint state data!", exc_info=e)
@@ -325,7 +377,7 @@ class BHumanImportStrategy(ImportStrategy):
                             name=list(joint_states.keys()),
                             position=list(joint_states.values()),  # TODO: Verify zero-definitions and value-shift!
                         )
-                        # converter = self.synced_data_converter
+                        converter = self.synced_data_converter
                     case Representation.JPEG_IMAGE.value:
                         thread = frame.thread
                         image = frame.image()
@@ -340,18 +392,20 @@ class BHumanImportStrategy(ImportStrategy):
                                 case _:
                                     logger.error(f"Unknown image thread: {thread}")
                                     continue
-                    case Representation.MOTION_REQUEST.value:
-                        pass
                     case _:
                         logger.error(f"Unknown representation: {representation}")
 
-                if converter is not None:
+                if self._is_all_synced_data_available(data) and converter is not None:
                     assert self.model_data.recording is not None, "Recording must be defined to create child models"
                     converter.populate_recording_metadata(data, self.model_data.recording)
                     model_data = converter.convert_to_model(data, relative_timestamp, self.model_data.recording)
                     self.model_data = self.model_data.merge(model_data)
 
         return self.model_data
+
+    def _is_all_synced_data_available(self, data: InputData) -> bool:
+        commands_for_all_joints_available = all(command is not None for command in data.joint_command.values())
+        return commands_for_all_joints_available and data.joint_state is not None and data.rotation is not None
 
     def verify_file(self, file_path: Path) -> bool:
         # Check file prefix .log
