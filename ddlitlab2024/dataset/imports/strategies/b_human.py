@@ -27,6 +27,7 @@ from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConv
 from ddlitlab2024.dataset.imports.data import InputData, ModelData
 from ddlitlab2024.dataset.imports.model_importer import ImportMetadata, ImportStrategy
 from ddlitlab2024.dataset.models import DEFAULT_IMG_SIZE, Recording
+from ddlitlab2024.utils.utils import camelcase_to_snakecase
 
 
 class Representation(str, Enum):
@@ -311,9 +312,20 @@ class BHumanImportStrategy(ImportStrategy):
                             logger.error("Could not get rotation data!", exc_info=e)
                             continue
                         data.rotation = SimpleNamespace(x=x, y=y, z=z, w=w)
-                        converter = self.synced_data_converter
+                        # converter = self.synced_data_converter
                     case Representation.JOINT_SENSOR_DATA.value:
-                        pass
+                        try:
+                            joint_states: dict[str, float] = {
+                                camelcase_to_snakecase(joint): angle for joint, angle in record.data["angles"]
+                            }
+                        except KeyError as e:
+                            logger.error("Could not get joint state data!", exc_info=e)
+                            continue
+                        data.joint_state = SimpleNamespace(
+                            name=list(joint_states.keys()),
+                            position=list(joint_states.values()),  # TODO: Verify zero-definitions and value-shift!
+                        )
+                        # converter = self.synced_data_converter
                     case Representation.JPEG_IMAGE.value:
                         thread = frame.thread
                         image = frame.image()
