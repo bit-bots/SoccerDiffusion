@@ -164,6 +164,8 @@ class Inference(Node):
         self.create_timer(interval, self.step, callback_group=MutuallyExclusiveCallbackGroup())
         interval = 1 / self.sample_rate
         self.create_timer(interval, self.update_buffers)
+        image_interval = 1 / 10
+        self.create_timer(image_interval, self.update_image_buffer)
 
     def joint_state_callback(self, msg: JointState):
         self.latest_joint_state = msg
@@ -180,25 +182,8 @@ class Inference(Node):
     def imu_callback(self, msg: JointState):
         self.latest_imu = msg
 
-    def update_buffers(self):
+    def update_image_buffer(self):
         with self.data_lock:
-            # First we want to fill the buffers
-            if self.latest_joint_state is not None:
-                # Joint names are not in the correct order, so we need to reorder them
-                joint_state = torch.zeros(len(JointStates.get_ordered_joint_names()))
-                for i, joint_name in enumerate(JointStates.get_ordered_joint_names()):
-                    idx = self.latest_joint_state.name.index(joint_name)
-                    joint_state[i] = self.latest_joint_state.position[idx]
-                self.joint_state_data.append(joint_state)
-
-            if self.latest_motor_command is not None:
-                # Joint names are not in the correct order, so we need to reorder them
-                joint_state = torch.zeros(len(JointStates.get_ordered_joint_names()))
-                for i, joint_name in enumerate(JointStates.get_ordered_joint_names()):
-                    idx = self.latest_motor_command.joint_names.index(joint_name)
-                    joint_state[i] = self.latest_motor_command.positions[idx]
-                self.joint_command_data.append(joint_state)
-
             if self.latest_image is not None:
                 # Here we don't just want to put the image in the buffer, but calculate the embedding first
                 # But for now the model dos not support the direct use of embeddings so we
@@ -218,6 +203,26 @@ class Inference(Node):
                 img = torch.tensor(img, dtype=torch.float32)
 
                 self.image_embeddings.append(img)
+        self.image_embeddings = self.image_embeddings[-self.hyper_params["image_context_length"] :]
+
+    def update_buffers(self):
+        with self.data_lock:
+            # First we want to fill the buffers
+            if self.latest_joint_state is not None:
+                # Joint names are not in the correct order, so we need to reorder them
+                joint_state = torch.zeros(len(JointStates.get_ordered_joint_names()))
+                for i, joint_name in enumerate(JointStates.get_ordered_joint_names()):
+                    idx = self.latest_joint_state.name.index(joint_name)
+                    joint_state[i] = self.latest_joint_state.position[idx]
+                self.joint_state_data.append(joint_state)
+
+            if self.latest_motor_command is not None:
+                # Joint names are not in the correct order, so we need to reorder them
+                joint_state = torch.zeros(len(JointStates.get_ordered_joint_names()))
+                for i, joint_name in enumerate(JointStates.get_ordered_joint_names()):
+                    idx = self.latest_motor_command.joint_names.index(joint_name)
+                    joint_state[i] = self.latest_motor_command.positions[idx]
+                self.joint_command_data.append(joint_state)
 
             if self.reconstruct_imu:
                 # Due to a bug in the recordings of the bit-bots we can not use the imu data directly,
@@ -260,7 +265,6 @@ class Inference(Node):
 
             # Remove the oldest data from the buffers
             self.joint_state_data = self.joint_state_data[-self.hyper_params["joint_state_context_length"] :]
-            self.image_embeddings = self.image_embeddings[-self.hyper_params["image_context_length"] :]
             self.imu_data = self.imu_data[-self.hyper_params["imu_context_length"] :]
             self.joint_command_data = self.joint_command_data[-self.hyper_params["action_context_length"] :]
 
