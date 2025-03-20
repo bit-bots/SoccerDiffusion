@@ -271,6 +271,9 @@ class BHumanImportStrategy(ImportStrategy):
 
         self.model_data = ModelData()
 
+    # TODO: Resample images, game_states with correct frequency
+    # TODO: Fix missing lower image
+
     def convert_to_model_data(self, file_path: Path) -> ModelData:
         self.verify_file(file_path)
         self.datetime = self.get_datetime_from_file_path(file_path)

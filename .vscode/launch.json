@@ -25,7 +25,7 @@
         //"${workspaceFolder}/input/b-human/selection/2023_GORE/2023-04-29/B-Human_Naova/Herta/Herta_Herta_CompetitionWalk_Default__Naova_1stHalf_6.log",
         "DummyLocation",
         "--caching",
-        "--video",
+        //"--video",
       ]
     }
   ]
