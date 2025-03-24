@@ -12,6 +12,7 @@ from bitbots_tf_buffer import Buffer
 from cv_bridge import CvBridge
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from game_controller_hl_interfaces.msg import GameState
+from torchvision.transforms import v2
 from profilehooks import profile
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.duration import Duration
@@ -196,11 +197,16 @@ class Inference(Node):
                 # Resize the image
                 img = cv2.resize(img, [self.hyper_params.get("image_resolution", 480)] * 2)
 
-                # Make chw from hwc
-                img = np.moveaxis(img, -1, 0)
+                preprocessing = v2.Compose(
+                    [
+                        v2.ToImage(),
+                        v2.ToDtype(torch.float32, scale=True),
+                        v2.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                    ]
+                )
 
-                # Convert the image to a tensor
-                img = torch.tensor(img, dtype=torch.float32)
+                # Convert the image to a tensor and normalize it
+                img = preprocessing(img)
 
                 self.image_embeddings.append(img)
         self.image_embeddings = self.image_embeddings[-self.hyper_params["image_context_length"] :]
@@ -240,10 +246,10 @@ class Inference(Node):
                     IMUEncoder.OrientationEmbeddingMethod(self.hyper_params["imu_orientation_embedding_method"])
                     == IMUEncoder.OrientationEmbeddingMethod.FIVE_DIM
                 ):
-                    quat = quats_to_5d(np.array(quat))
+                    quat = quats_to_5d(np.array([quat]))[0]
 
                 # Store imu data as np array in the buffer
-                self.imu_data.append(torch.tensor(quat))
+                self.imu_data.append(torch.tensor(quat).float())
             elif self.latest_imu is not None:
                 imu_transform = self.latest_imu
                 quat = [
