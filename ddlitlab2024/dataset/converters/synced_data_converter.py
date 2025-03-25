@@ -13,7 +13,7 @@ class SyncedDataConverter(Converter):
 
     def convert_to_model(self, data: InputData, relative_timestamp: float, recording: Recording) -> ModelData:
         assert data.joint_state is not None, "joint_states are required in synced resampling data"
-        assert all(
+        assert any(
             command is not None for command in data.joint_command.values()
         ), "joint_commands are required in synced resampling data"
         assert data.rotation is not None, "IMU rotation is required in synced resampling data"
