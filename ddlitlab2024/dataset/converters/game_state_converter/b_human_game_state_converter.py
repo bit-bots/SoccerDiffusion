@@ -6,6 +6,8 @@ from ddlitlab2024.dataset.imports.data import InputData, ModelData
 from ddlitlab2024.dataset.models import GameState, Recording, RobotState, TeamColor
 from ddlitlab2024.dataset.resampling.original_rate_resampler import OriginalRateResampler
 
+# ruff: noqa: N815
+
 
 class State(Enum):  # Adapted from b-human's Src/Representations/Infrastructure/GameState.h
     beforeHalf = 0
