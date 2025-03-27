@@ -27,7 +27,6 @@ from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConv
 from ddlitlab2024.dataset.imports.data import InputData, ModelData
 from ddlitlab2024.dataset.imports.model_importer import ImportMetadata, ImportStrategy
 from ddlitlab2024.dataset.models import DEFAULT_IMG_SIZE, Recording
-from ddlitlab2024.utils.utils import shift_radian_to_positive_range
 
 
 class Representation(str, Enum):
@@ -318,97 +317,73 @@ class BHumanImportStrategy(ImportStrategy):
                         converter = self.synced_data_converter
                     case Representation.JOINT_REQUEST.value:
                         try:
-                            data.r_shoulder_pitch_command = shift_radian_to_positive_range(
-                                record.data["angles"]["rShoulderPitch"]
-                            )
-                            data.l_shoulder_pitch_command = shift_radian_to_positive_range(
-                                record.data["angles"]["lShoulderPitch"]
-                            )
-                            data.r_shoulder_roll_command = shift_radian_to_positive_range(
-                                record.data["angles"]["rShoulderRoll"]
-                            )
-                            data.l_shoulder_roll_command = shift_radian_to_positive_range(
-                                record.data["angles"]["lShoulderRoll"]
-                            )
-                            data.r_elbow_command = shift_radian_to_positive_range(record.data["angles"]["rElbowRoll"])
-                            data.r_elbow_yaw_command = shift_radian_to_positive_range(
-                                record.data["angles"]["rElbowYaw"]
-                            )
-                            data.l_elbow_command = shift_radian_to_positive_range(record.data["angles"]["lElbowRoll"])
-                            data.l_elbow_yaw_command = shift_radian_to_positive_range(
-                                record.data["angles"]["lElbowYaw"]
-                            )
-                            # Joint is a combination of both Yaw and Pitch.
-                            # Left and right are controlled by a single actuator.
-                            # Left has priority.
-                            # See http://doc.aldebaran.com/2-8/family/nao_technical/joints_naov6.html#naov6-joints-pelvis-joints
-                            data.r_hip_yaw_command = shift_radian_to_positive_range(
-                                record.data["angles"]["rHipYawPitch"]
-                            )
-                            data.l_hip_yaw_command = shift_radian_to_positive_range(
-                                record.data["angles"]["lHipYawPitch"]
-                            )
-                            data.r_hip_roll_command = shift_radian_to_positive_range(record.data["angles"]["rHipRoll"])
-                            data.l_hip_roll_command = shift_radian_to_positive_range(record.data["angles"]["lHipRoll"])
-                            data.r_hip_pitch_command = shift_radian_to_positive_range(
-                                record.data["angles"]["rHipPitch"]
-                            )
-                            data.l_hip_pitch_command = shift_radian_to_positive_range(
-                                record.data["angles"]["lHipPitch"]
-                            )
-                            data.r_knee_command = shift_radian_to_positive_range(record.data["angles"]["rKneePitch"])
-                            data.l_knee_command = shift_radian_to_positive_range(record.data["angles"]["lKneePitch"])
-                            data.r_ankle_pitch_command = shift_radian_to_positive_range(
-                                record.data["angles"]["rAnklePitch"]
-                            )
-                            data.l_ankle_pitch_command = shift_radian_to_positive_range(
-                                record.data["angles"]["lAnklePitch"]
-                            )
-                            data.r_ankle_roll_command = shift_radian_to_positive_range(
-                                record.data["angles"]["rAnkleRoll"]
-                            )
-                            data.l_ankle_roll_command = shift_radian_to_positive_range(
-                                record.data["angles"]["lAnkleRoll"]
-                            )
-                            data.head_pan_command = shift_radian_to_positive_range(record.data["angles"]["headYaw"])
-                            data.head_tilt_command = shift_radian_to_positive_range(record.data["angles"]["headPitch"])
+                            joint_commands: dict[str, float] = {
+                                "r_shoulder_pitch": record.data["angles"]["rShoulderPitch"],
+                                "l_shoulder_pitch": record.data["angles"]["lShoulderPitch"],
+                                "r_shoulder_roll": record.data["angles"]["rShoulderRoll"],
+                                "l_shoulder_roll": record.data["angles"]["lShoulderRoll"],
+                                "r_elbow": record.data["angles"]["rElbowRoll"],
+                                "r_elbow_yaw": record.data["angles"]["rElbowYaw"],
+                                "l_elbow": record.data["angles"]["lElbowRoll"],
+                                "l_elbow_yaw": record.data["angles"]["lElbowYaw"],
+                                # Joint is a combination of both Yaw and Pitch.
+                                # Left and right are controlled by a single actuator.
+                                # Left has priority.
+                                # See http://doc.aldebaran.com/2-8/family/nao_technical/joints_naov6.html#naov6-joints-pelvis-joints
+                                # TODO: extract different axis from angled hip joints joint
+                                "r_hip_yaw": record.data["angles"]["rHipYawPitch"],
+                                "l_hip_yaw": record.data["angles"]["lHipYawPitch"],
+                                "r_hip_roll": record.data["angles"]["rHipRoll"],
+                                "l_hip_roll": record.data["angles"]["lHipRoll"],
+                                "r_hip_pitch": record.data["angles"]["rHipPitch"],
+                                "l_hip_pitch": record.data["angles"]["lHipPitch"],
+                                "r_knee": record.data["angles"]["rKneePitch"],
+                                "l_knee": record.data["angles"]["lKneePitch"],
+                                "r_ankle_pitch": record.data["angles"]["rAnklePitch"],
+                                "l_ankle_pitch": record.data["angles"]["lAnklePitch"],
+                                "r_ankle_roll": record.data["angles"]["rAnkleRoll"],
+                                "l_ankle_roll": record.data["angles"]["lAnkleRoll"],
+                                "head_pan": record.data["angles"]["headYaw"],
+                                "head_tilt": record.data["angles"]["headPitch"],
+                            }
                         except KeyError as e:
                             logger.error("Could not get joint command data!", exc_info=e)
                             continue
+                        data.joint_command = SimpleNamespace(
+                            joint_names=list(joint_commands.keys()),
+                            positions=list(joint_commands.values()),  # TODO: Verify zero-definitions and value-shift!
+                        )
                         converter = self.synced_data_converter
                     case Representation.JOINT_SENSOR_DATA.value:
                         try:
                             joint_states: dict[str, float] = {
-                                "r_shoulder_pitch": shift_radian_to_positive_range(
-                                    record.data["angles"]["rShoulderPitch"]
-                                ),
-                                "l_shoulder_pitch": shift_radian_to_positive_range(
-                                    record.data["angles"]["lShoulderPitch"]
-                                ),
-                                "r_shoulder_roll": shift_radian_to_positive_range(
-                                    record.data["angles"]["rShoulderRoll"]
-                                ),
-                                "l_shoulder_roll": shift_radian_to_positive_range(
-                                    record.data["angles"]["lShoulderRoll"]
-                                ),
-                                "r_elbow": shift_radian_to_positive_range(record.data["angles"]["rElbowRoll"]),
-                                "r_elbow_yaw": shift_radian_to_positive_range(record.data["angles"]["rElbowYaw"]),
-                                "l_elbow": shift_radian_to_positive_range(record.data["angles"]["lElbowRoll"]),
-                                "l_elbow_yaw": shift_radian_to_positive_range(record.data["angles"]["lElbowYaw"]),
-                                "r_hip_yaw": shift_radian_to_positive_range(record.data["angles"]["rHipYawPitch"]),
-                                "l_hip_yaw": shift_radian_to_positive_range(record.data["angles"]["lHipYawPitch"]),
-                                "r_hip_roll": shift_radian_to_positive_range(record.data["angles"]["rHipRoll"]),
-                                "l_hip_roll": shift_radian_to_positive_range(record.data["angles"]["lHipRoll"]),
-                                "r_hip_pitch": shift_radian_to_positive_range(record.data["angles"]["rHipPitch"]),
-                                "l_hip_pitch": shift_radian_to_positive_range(record.data["angles"]["lHipPitch"]),
-                                "r_knee": shift_radian_to_positive_range(record.data["angles"]["rKneePitch"]),
-                                "l_knee": shift_radian_to_positive_range(record.data["angles"]["lKneePitch"]),
-                                "r_ankle_pitch": shift_radian_to_positive_range(record.data["angles"]["rAnklePitch"]),
-                                "l_ankle_pitch": shift_radian_to_positive_range(record.data["angles"]["lAnklePitch"]),
-                                "r_ankle_roll": shift_radian_to_positive_range(record.data["angles"]["rAnkleRoll"]),
-                                "l_ankle_roll": shift_radian_to_positive_range(record.data["angles"]["lAnkleRoll"]),
-                                "head_pan": shift_radian_to_positive_range(record.data["angles"]["headYaw"]),
-                                "head_tilt": shift_radian_to_positive_range(record.data["angles"]["headPitch"]),
+                                "r_shoulder_pitch": record.data["angles"]["rShoulderPitch"],
+                                "l_shoulder_pitch": record.data["angles"]["lShoulderPitch"],
+                                "r_shoulder_roll": record.data["angles"]["rShoulderRoll"],
+                                "l_shoulder_roll": record.data["angles"]["lShoulderRoll"],
+                                "r_elbow": record.data["angles"]["rElbowRoll"],
+                                "r_elbow_yaw": record.data["angles"]["rElbowYaw"],
+                                "l_elbow": record.data["angles"]["lElbowRoll"],
+                                "l_elbow_yaw": record.data["angles"]["lElbowYaw"],
+                                # Joint is a combination of both Yaw and Pitch.
+                                # Left and right are controlled by a single actuator.
+                                # Left has priority.
+                                # See http://doc.aldebaran.com/2-8/family/nao_technical/joints_naov6.html#naov6-joints-pelvis-joints
+                                # TODO: extract different axis from angled hip joints joint
+                                "r_hip_yaw": record.data["angles"]["rHipYawPitch"],
+                                "l_hip_yaw": record.data["angles"]["lHipYawPitch"],
+                                "r_hip_roll": record.data["angles"]["rHipRoll"],
+                                "l_hip_roll": record.data["angles"]["lHipRoll"],
+                                "r_hip_pitch": record.data["angles"]["rHipPitch"],
+                                "l_hip_pitch": record.data["angles"]["lHipPitch"],
+                                "r_knee": record.data["angles"]["rKneePitch"],
+                                "l_knee": record.data["angles"]["lKneePitch"],
+                                "r_ankle_pitch": record.data["angles"]["rAnklePitch"],
+                                "l_ankle_pitch": record.data["angles"]["lAnklePitch"],
+                                "r_ankle_roll": record.data["angles"]["rAnkleRoll"],
+                                "l_ankle_roll": record.data["angles"]["lAnkleRoll"],
+                                "head_pan": record.data["angles"]["headYaw"],
+                                "head_tilt": record.data["angles"]["headPitch"],
                             }
                         except KeyError as e:
                             logger.error("Could not get joint state data!", exc_info=e)
