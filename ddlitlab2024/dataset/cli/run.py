@@ -67,12 +67,18 @@ def main():
                     case ImportType.BIT_BOTS:
                         from ddlitlab2024.dataset.imports.strategies.bit_bots import BitBotsImportStrategy
 
+                        logger.info(f"Trying to import file '{args.file}' to database...")
+
+                        simulated = False
+                        if "simulation" in str(args.file) or "simulated" in str(args.file):
+                            simulated = True
+
                         metadata = ImportMetadata(
                             allow_public=True,
                             team_name="Bit-Bots",
                             robot_type="Wolfgang-OP",
                             location=location,
-                            simulated=False,
+                            simulated=simulated,
                         )
                         upper_image_converter = BitbotsImageConverter(MaxRateResampler(IMAGE_MAX_RESAMPLE_RATE_HZ))
                         game_state_converter = BitBotsGameStateConverter(OriginalRateResampler())
