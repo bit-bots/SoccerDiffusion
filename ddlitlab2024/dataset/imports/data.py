@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ddlitlab2024.dataset.models import GameState, Image, JointCommands, JointStates, Recording, Rotation
-from ddlitlab2024.utils.utils import camelcase_to_snakecase, shift_radian_to_positive_range
+from ddlitlab2024.utils.utils import camelcase_to_snakecase
 
 
 def joints_dict_from_msg_data(joints_data: list[tuple[str, float]]) -> dict[str, float]:
@@ -10,8 +10,7 @@ def joints_dict_from_msg_data(joints_data: list[tuple[str, float]]) -> dict[str,
 
     for name, position in joints_data:
         key = camelcase_to_snakecase(name)
-        value = shift_radian_to_positive_range(position)
-        joints_dict[key] = value
+        joints_dict[key] = position
 
     return joints_dict
 
@@ -30,8 +29,8 @@ class InputData:
     image: Any = None
     lower_image: Any = None
     game_state: Any = None
-    joint_state: Any = None
     rotation: Any = None
+    _joint_state: Any = None
 
     # as we are not always sending joint commands for all joints at once
     # we need to separate them here, to enable resampling on a per joint basis
@@ -57,6 +56,16 @@ class InputData:
     l_ankle_roll_command: Any = None
     head_pan_command: Any = None
     head_tilt_command: Any = None
+
+    @property
+    def joint_state(self):
+        return self._joint_state
+
+    @joint_state.setter
+    def joint_state(self, msg):
+        joint_states_data = list(zip(msg.name, msg.position))
+
+        self._joint_state = joints_dict_from_msg_data(joint_states_data)
 
     @property
     def joint_command(self):
