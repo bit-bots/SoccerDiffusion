@@ -1,5 +1,5 @@
 name: Setup Repository
-description: Checkout code, install poetry, set up python and install dependencies
+description: Checkout code, install apt deps, install poetry, set up python and install dependencies
 inputs:
   python-version:
     description: "Python version to use"
@@ -7,6 +7,19 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Install apt dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          ccache \
+          clang \
+          cmake \
+          libstdc++-12-dev \
+          llvm \
+          mold \
+          ninja-build \
+      shell: bash
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:

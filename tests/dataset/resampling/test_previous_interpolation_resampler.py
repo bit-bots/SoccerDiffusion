@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 
 from ddlitlab2024.dataset.imports.data import InputData
@@ -73,7 +75,10 @@ def resampler() -> PreviousInterpolationResampler:
 
 @pytest.fixture
 def input_data() -> InputData:
-    return InputData(joint_state="joint_state", rotation="rotation")
+    data = InputData(rotation="rotation")
+    data.joint_state = SimpleNamespace(name=["RKnee"], position=[0.0])
+
+    return data
 
 
 @pytest.fixture
