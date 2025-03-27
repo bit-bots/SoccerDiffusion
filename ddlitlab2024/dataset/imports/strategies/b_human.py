@@ -400,9 +400,11 @@ class BHumanImportStrategy(ImportStrategy):
                             match thread:
                                 case Thread.Upper.value:
                                     data.image = image
+                                    data.lower_image = None
                                     converter = self.upper_image_converter
                                 case Thread.Lower.value:
                                     data.lower_image = image
+                                    data.image = None
                                     converter = self.lower_image_converter
                                 case _:
                                     logger.error(f"Unknown image thread: {thread}")
