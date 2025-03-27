@@ -47,7 +47,7 @@ class BitbotsImageConverter(ImageConverter):
 
     def _create_image(self, data, sampling_timestamp: float, recording: Recording) -> Image:
         image = data.image
-        img_array = np.frombuffer(image.data, np.uint8).reshape((image.height, image.width, 3))
+        img_array = np.frombuffer(image.data, np.uint8).reshape((image.height, image.width, -1))
 
         will_img_be_upscaled = recording.img_width_scaling > 1.0 or recording.img_height_scaling > 1.0
         interpolation = cv2.INTER_AREA
@@ -55,11 +55,13 @@ class BitbotsImageConverter(ImageConverter):
             interpolation = cv2.INTER_CUBIC
 
         resized_img = cv2.resize(img_array, (recording.img_width, recording.img_height), interpolation=interpolation)
-        match data.encoding:
+        match image.encoding:
             case "rgb8":
                 resized_rgb_img = resized_img
             case "bgr8":
                 resized_rgb_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
+            case "bgra8":
+                resized_rgb_img = cv2.cvtColor(resized_img, cv2.COLOR_BGRA2RGB)
             case _:
                 raise AssertionError(f"Unsupported image encoding: {image.encoding}")
 
@@ -109,6 +111,12 @@ class BHumanImageConverter(ImageConverter):
         resized_img = cv2.resize(image, (recording.img_width, recording.img_height), interpolation=interpolation)
 
         resized_rgb_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
+
+        assert resized_rgb_img.shape == (
+            recording.img_height,
+            recording.img_width,
+            3,
+        ), "Converted image does not have the expected dimensions"
 
         return Image(
             stamp=sampling_timestamp,
