@@ -92,7 +92,7 @@ class CLIArgs:
             raise CLIArgumentError(f"File does not exist: {args.file}")
 
         if args.type == ImportType.BIT_BOTS and not args.file.suffix == ".mcap":
-            raise CLIArgumentError(f"Rosbag import file not '*.mcap': {args.file}")
+            raise CLIArgumentError(f"Bit-Bots import file not '*.mcap': {args.file}")
 
     def db_validation(self, args):
         if args.db_command not in DBCommand.values():
