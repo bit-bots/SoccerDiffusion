@@ -15,7 +15,7 @@ class GameStateMessage(int, Enum):
     FINISHED = 4
 
 
-class GameStateConverter(Converter):
+class BitBotsGameStateConverter(Converter):
     def __init__(self, resampler: OriginalRateResampler) -> None:
         self.resampler = resampler
 

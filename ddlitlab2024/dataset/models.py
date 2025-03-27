@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional
 
@@ -95,6 +95,11 @@ class Recording(Base):
         CheckConstraint(team_color.in_(TeamColor.values()), name="team_color_enum"),
         CheckConstraint(end_time >= start_time, name="end_time_ge_start_time"),
     )
+
+    def duration(self) -> Optional[timedelta]:
+        if self.start_time is None or self.end_time is None:
+            return None
+        return self.end_time - self.start_time
 
 
 class Image(Base):
@@ -221,6 +226,7 @@ class JointStates(Base):
             JointStates.l_ankle_pitch.name,
             JointStates.l_ankle_roll.name,
             JointStates.l_elbow.name,
+            JointStates.l_elbow_yaw.name,
             JointStates.l_hip_pitch.name,
             JointStates.l_hip_roll.name,
             JointStates.l_hip_yaw.name,
@@ -230,13 +236,13 @@ class JointStates(Base):
             JointStates.r_ankle_pitch.name,
             JointStates.r_ankle_roll.name,
             JointStates.r_elbow.name,
+            JointStates.r_elbow_yaw.name,
             JointStates.r_hip_pitch.name,
             JointStates.r_hip_roll.name,
             JointStates.r_hip_yaw.name,
             JointStates.r_knee.name,
             JointStates.r_shoulder_pitch.name,
             JointStates.r_shoulder_roll.name,
-            # TODO add new NAO joints
         ]
 
 
