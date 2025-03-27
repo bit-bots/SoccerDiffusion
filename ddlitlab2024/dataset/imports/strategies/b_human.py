@@ -455,7 +455,7 @@ class BHumanImportStrategy(ImportStrategy):
 
         pattern: str = (
             r"20(\d{2})[-_.:\s](\d{1,2})[-_.:\s](\d{1,2})"  # Match the year, month, and day
-            r"(?:[-_.:\s]+(\d{1,2})[-_.:\s](\d{1,2}))?"  # Match the time if present, separated by one or more delimiters
+            r"(?:[-_.:\s]+(\d{1,2})[-_.:\s](\d{1,2}))?"  # Match the time if present, separated 1+ delimiters
         )
         # Find all matches in the part
         matches = re.findall(pattern, str(path))
