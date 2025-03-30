@@ -10,7 +10,6 @@ import torch.nn.functional as F  # noqa
 from bitbots_msgs.msg import JointCommand
 from bitbots_tf_buffer import Buffer
 from cv_bridge import CvBridge
-from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from game_controller_hl_interfaces.msg import GameState
 from torchvision.transforms import v2
 from profilehooks import profile
@@ -122,6 +121,7 @@ class Inference(Node):
         self.get_logger().info("Load model")
         self.model = End2EndDiffusionTransformer(
             num_joints=self.hyper_params["num_joints"],
+            resolution=2048,
             hidden_dim=self.hyper_params["hidden_dim"],
             use_action_history=self.hyper_params["use_action_history"],
             num_action_history_encoder_layers=self.hyper_params["num_action_history_encoder_layers"],
@@ -151,12 +151,6 @@ class Inference(Node):
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.model.eval()
         print(self.normalizer.mean)
-
-        # Create diffusion noise scheduler
-        self.get_logger().info("Create diffusion noise scheduler")
-        self.scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2", clip_sample=False)
-        self.scheduler.config["num_train_timesteps"] = self.hyper_params["train_denoising_timesteps"]
-        self.scheduler.set_timesteps(self.inference_denosing_timesteps)
 
         # Create control timer to run inference at a fixed rate
         interval = 1 / self.sample_rate * self.hyper_params["trajectory_prediction_length"]
@@ -294,11 +288,6 @@ class Inference(Node):
 
         print("Batch: ", batch["image_data"].shape)
 
-        # Perform the denoising process
-        trajectory = torch.randn(
-            1, self.hyper_params["trajectory_prediction_length"], self.hyper_params["num_joints"]
-        ).to(device)
-
         start_ros_time = self.get_clock().now()
 
         ## Perform the embedding of the conditioning
@@ -308,27 +297,39 @@ class Inference(Node):
         # Denoise the trajectory
         start = time.time()
 
-        if self.hyper_params.get("distilled_decoder", False):
+        resolution = 2048
+
+        generated_token_ids = []
+
+        # Create the start token
+        start_token = torch.zeros((1, 1, resolution), device=device)
+
+        for _ in range(self.hyper_params["trajectory_prediction_length"] * self.hyper_params["num_joints"]):
             # Directly predict the trajectory based on the noise
             with torch.no_grad():
+                # Do one hot encoding
+                joint_targets_bins_vec = F.one_hot(torch.tensor(generated_token_ids, device=device), num_classes=resolution).float().unsqueeze(0)
+
+                # Add the start token to the trajectory
+                decoder_input = torch.cat([start_token, joint_targets_bins_vec], dim=1)
+
+                # TODO kvcache
                 trajectory = self.model.forward_with_context(
-                    embedded_input, trajectory, torch.tensor([0], device=device)
+                    embedded_input, decoder_input, torch.tensor([0], device=device)
                 )
-        else:
-            # Perform the denoising process
-            self.scheduler.set_timesteps(self.inference_denosing_timesteps)
-            for t in self.scheduler.timesteps:
-                with torch.no_grad():
-                    # Predict the noise residual
-                    noise_pred = self.model.forward_with_context(
-                        embedded_input, trajectory, torch.tensor([t], device=device)
-                    )
 
-                    # Update the trajectory based on the predicted noise and the current step of the denoising process
-                    trajectory = self.scheduler.step(noise_pred, t, trajectory).prev_sample
+                # Get the next token
+                next_token = trajectory[0, -1].argmax().item()
+                generated_token_ids.append(next_token)
 
-        # Undo the normalization
-        trajectory = self.normalizer.denormalize(trajectory)
+        # Get angles from the token ids
+        trajectory = torch.tensor(
+            generated_token_ids, device=device
+        ).reshape(
+            self.hyper_params["trajectory_prediction_length"],
+            self.hyper_params["num_joints"]
+        ).float() / resolution * 2 * np.pi
+
 
         # Publish the trajectory
         trajectory_msg = JointTrajectory()
@@ -337,7 +338,7 @@ class Inference(Node):
         trajectory_msg.points = []
         for i in range(self.hyper_params["trajectory_prediction_length"]):
             point = JointTrajectoryPoint()
-            point.positions = trajectory[0, i].cpu().numpy() - np.pi
+            point.positions = trajectory[i].cpu().numpy() - np.pi
             point.time_from_start = Duration(nanoseconds=int(1e9 / self.sample_rate * i)).to_msg()
             point.velocities = [-1.0] * (len(JointStates.get_ordered_joint_names()))
             point.accelerations = [-1.0] * len(JointStates.get_ordered_joint_names())

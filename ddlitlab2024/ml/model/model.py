@@ -13,6 +13,7 @@ class End2EndDiffusionTransformer(nn.Module):
     def __init__(
         self,
         num_joints: int,
+        resolution: int,
         hidden_dim: int,
         use_action_history: bool,
         num_action_history_encoder_layers: int,
@@ -105,11 +106,11 @@ class End2EndDiffusionTransformer(nn.Module):
 
         # Define the decoder model for the diffusion denoising process
         self.diffusion_action_generator = DiffusionActionGenerator(
-            num_joints=num_joints,
+            num_joints=resolution,
             hidden_dim=hidden_dim,
             num_layers=num_decoder_layers,
             num_heads=4,
-            max_seq_len=trajectory_prediction_length,
+            max_seq_len=trajectory_prediction_length * resolution,
         )
 
         # Store normalization parameters

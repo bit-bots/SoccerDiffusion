@@ -9,7 +9,6 @@ import torch
 import torch.nn.functional as F  # noqa
 import wandb
 import yaml
-from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -106,6 +105,8 @@ if __name__ == "__main__":
         worker_init_fn=worker_init_fn,
     )
 
+    resolution = 512
+
     # Get some samples to estimate the mean and std
     logger.info("Estimating normalization parameters")
     random_indices = np.random.randint(0, len(dataset), (params["num_normalization_samples"],))
@@ -115,6 +116,7 @@ if __name__ == "__main__":
     # Initialize the Transformer model and optimizer, and move model to device
     model = End2EndDiffusionTransformer(
         num_joints=params["num_joints"],
+        resolution=resolution,
         hidden_dim=params["hidden_dim"],
         use_action_history=params["use_action_history"],
         num_action_history_encoder_layers=params["num_action_history_encoder_layers"],
@@ -184,10 +186,6 @@ if __name__ == "__main__":
         else:
             logger.warning("No learning rate scheduler state found in the checkpoint")
 
-    # Create diffusion noise scheduler
-    scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2", clip_sample=False)
-    scheduler.config["num_train_timesteps"] = params["train_denoising_timesteps"]
-
     # Training loop
     for epoch in range(params["epochs"]):
         # Iterate over the dataset
@@ -203,33 +201,28 @@ if __name__ == "__main__":
             # due to the last batch being smaller
             bs = joint_targets.size(0)
 
-            # Normalize the target actions
-            joint_targets = normalizer.normalize(joint_targets)
-
             # Reset the gradients
             optimizer.zero_grad()
 
-            # Sample a random timestep for each trajectory in the batch
-            random_timesteps = (
-                torch.randint(0, scheduler.config["num_train_timesteps"], (joint_targets.size(0),)).long().to(device)
-            )
+            # Discretize the trajectory angles
+            joint_targets_bins = torch.round(joint_targets / (2*np.pi) * resolution).long()
 
-            # Sample gaussian noise to add to the entire trajectory
-            noise = torch.randn_like(joint_targets).to(device)
+            # Create the start token
+            start_token = torch.zeros((bs, 1, resolution), device=device)
 
-            # Forward diffusion: Add noise to the entire trajectory at the random timestep
-            noisy_trajectory = scheduler.add_noise(joint_targets, noise, random_timesteps)
+            # Drop the joint dimension and just make it a sequence of tokens like [Join1, Joint2, Joint3, Joint1, Joint2, Joint3, ...]
+            joint_targets_bins = joint_targets_bins.view(bs, -1)
 
-            # Predict the error using the model
-            if args.decoder_pretraining:
-                predicted_traj = model.forward_with_context(
-                    [torch.randn((bs, 10, params["hidden_dim"]), device=device)], noisy_trajectory, random_timesteps
-                )
-            else:
-                predicted_traj = model(batch, noisy_trajectory, random_timesteps)
+            # Do one hot encoding
+            joint_targets_bins_vec = F.one_hot(joint_targets_bins, num_classes=resolution).float()
 
-            # Compute the loss
-            loss = F.mse_loss(predicted_traj, noise)
+            # Add the start token to the trajectory
+            decoder_input = torch.cat([start_token, joint_targets_bins_vec[:, :-1]], dim=1)
+
+            predicted_traj = model(batch, decoder_input, torch.zeros(bs, device=device))
+
+            # Compute the loss (CrossEntropy)
+            loss = F.cross_entropy(predicted_traj.view(-1, resolution), joint_targets_bins.view(-1))
 
             if i % 20 == 0:
                 pbar.set_postfix_str(
