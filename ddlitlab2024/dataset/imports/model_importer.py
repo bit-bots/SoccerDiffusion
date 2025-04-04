@@ -32,7 +32,7 @@ class ModelImporter:
     def import_to_db(self, file_path: Path):
         model_data: ModelData = self.strategy.convert_to_model_data(file_path)
 
-        required_fields = ["images", "game_states", "joint_states", "joint_commands"]
+        required_fields = ["images", "game_states", "joint_states", "joint_commands", "rotations"]
         for field in required_fields:
             if not len(getattr(model_data, field)):
                 raise ValueError(f"No {field} models extracted from the file, aborting import.")
