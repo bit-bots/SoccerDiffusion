@@ -44,9 +44,9 @@ class Inference(Node):
             [rclpy.parameter.Parameter("use_sim_time", rclpy.Parameter.Type.BOOL, True)],
         )
 
-        self.reconstruct_imu = False
+        self.reconstruct_imu = True
         checkpoint_path = (
-            "../training/trajectory_transformer_model_sim_low_res_512_distill.pth"
+            "../training/trajectory_transformer_model_go_distill.pth"
             # "../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
         )
         self.inference_denosing_timesteps = 30
@@ -62,9 +62,6 @@ class Inference(Node):
         self.joint_state_sub = self.create_subscription(JointState, "/joint_states", self.joint_state_callback, 10)
         self.img_sub = self.create_subscription(Image, "/camera/image_proc", self.img_callback, 10)
         self.gamestate_sub = self.create_subscription(GameState, "/gamestate", self.gamestate_callback, 10)
-        self.motor_command_sub = self.create_subscription(
-            JointCommand, "/DynamixelController/command", self.motor_command_callback, 10
-        )
         self.imu_sub = self.create_subscription(JointState, "/imu/data", self.imu_callback, 10)
 
         # Publisher for the output topic
@@ -84,7 +81,6 @@ class Inference(Node):
         self.joint_state_data = []
 
         # Joint command buffer
-        self.latest_motor_command: Optional[JointCommand] = None
         self.joint_command_data = []
 
         # Gamestate
@@ -177,9 +173,6 @@ class Inference(Node):
     def gamestate_callback(self, msg: GameState):
         self.latest_game_state = msg
 
-    def motor_command_callback(self, msg: JointCommand):
-        self.latest_motor_command = msg
-
     def imu_callback(self, msg: JointState):
         self.latest_imu = msg
 
@@ -221,14 +214,6 @@ class Inference(Node):
                     idx = self.latest_joint_state.name.index(joint_name)
                     joint_state[i] = self.latest_joint_state.position[idx]
                 self.joint_state_data.append(joint_state)
-
-            if self.latest_motor_command is not None:
-                # Joint names are not in the correct order, so we need to reorder them
-                joint_state = torch.zeros(len(JointStates.get_ordered_joint_names()))
-                for i, joint_name in enumerate(JointStates.get_ordered_joint_names()):
-                    idx = self.latest_motor_command.joint_names.index(joint_name)
-                    joint_state[i] = self.latest_motor_command.positions[idx]
-                self.joint_command_data.append(joint_state)
 
             if self.reconstruct_imu:
                 # Due to a bug in the recordings of the bit-bots we can not use the imu data directly,
@@ -272,7 +257,6 @@ class Inference(Node):
             # Remove the oldest data from the buffers
             self.joint_state_data = self.joint_state_data[-self.hyper_params["joint_state_context_length"] :]
             self.imu_data = self.imu_data[-self.hyper_params["imu_context_length"] :]
-            self.joint_command_data = self.joint_command_data[-self.hyper_params["action_context_length"] :]
 
     @profile
     def step(self):
@@ -289,7 +273,7 @@ class Inference(Node):
                     torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device) + 3 * np.pi
                 )
                 % (2 * np.pi),  # torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device),
-                "game_state": torch.zeros(1, dtype=torch.long).to(device),
+                "game_state": torch.zeros(1, dtype=torch.long).to(device) + 2,
             }
 
         print("Batch: ", batch["image_data"].shape)
@@ -329,6 +313,11 @@ class Inference(Node):
 
         # Undo the normalization
         trajectory = self.normalizer.denormalize(trajectory)
+
+        # Add predicted trajectory to the buffer
+        for state in trajectory[0]:
+            self.joint_command_data.append(state.cpu() - np.pi)
+        self.joint_command_data = self.joint_command_data[-self.hyper_params["action_context_length"] :]
 
         # Publish the trajectory
         trajectory_msg = JointTrajectory()
