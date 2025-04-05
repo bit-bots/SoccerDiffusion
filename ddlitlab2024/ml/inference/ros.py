@@ -46,7 +46,7 @@ class Inference(Node):
 
         self.reconstruct_imu = False
         checkpoint_path = (
-            "../training/trajectory_transformer_model_sim_low_res_512_distill.pth"
+            "../training/bh_01.pth"
             # "../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
         )
         self.inference_denosing_timesteps = 30
@@ -214,7 +214,7 @@ class Inference(Node):
     def update_buffers(self):
         with self.data_lock:
             # First we want to fill the buffers
-            if self.latest_joint_state is not None:
+            if self.latest_joint_state is not None and False:
                 # Joint names are not in the correct order, so we need to reorder them
                 joint_state = torch.zeros(len(JointStates.get_ordered_joint_names()))
                 for i, joint_name in enumerate(JointStates.get_ordered_joint_names()):
@@ -281,8 +281,8 @@ class Inference(Node):
         # Prepare the data for inference
         with self.data_lock:
             batch = {
-                "joint_state": (torch.stack(list(self.joint_state_data), dim=0).unsqueeze(0).to(device) + 3 * np.pi)
-                % (2 * np.pi),
+                #"joint_state": (torch.stack(list(self.joint_state_data), dim=0).unsqueeze(0).to(device) + 3 * np.pi)
+                #% (2 * np.pi),
                 "image_data": torch.stack(list(self.image_embeddings), dim=0).unsqueeze(0).to(device),
                 "rotation": torch.stack(list(self.imu_data), dim=0).unsqueeze(0).to(device),
                 "joint_command_history": (
@@ -295,7 +295,7 @@ class Inference(Node):
         print("Batch: ", batch["image_data"].shape)
 
         # Perform the denoising process
-        trajectory = torch.randn(
+        trajectory = torch.zeros(
             1, self.hyper_params["trajectory_prediction_length"], self.hyper_params["num_joints"]
         ).to(device)
 
@@ -328,20 +328,33 @@ class Inference(Node):
                     trajectory = self.scheduler.step(noise_pred, t, trajectory).prev_sample
 
         # Undo the normalization
-        trajectory = self.normalizer.denormalize(trajectory)
+        #trajectory = self.normalizer.denormalize(trajectory)
+
+        # Remove unused joints
+        remove_joints = [
+            "LElbowYaw",
+            "RElbowYaw",
+        ]
+
+        filtered_joint_idx = []
+        filtered_joint_names = []
+        for joint in JointStates.get_ordered_joint_names():
+            if joint not in remove_joints:
+                filtered_joint_idx.append(JointStates.get_ordered_joint_names().index(joint))
+                filtered_joint_names.append(joint)
 
         # Publish the trajectory
         trajectory_msg = JointTrajectory()
         trajectory_msg.header.stamp = Time.to_msg(start_ros_time)
-        trajectory_msg.joint_names = JointStates.get_ordered_joint_names()
+        trajectory_msg.joint_names = filtered_joint_names
         trajectory_msg.points = []
         for i in range(self.hyper_params["trajectory_prediction_length"]):
             point = JointTrajectoryPoint()
-            point.positions = trajectory[0, i].cpu().numpy() - np.pi
+            point.positions = trajectory[0, i, filtered_joint_idx].cpu().numpy() - np.pi
             point.time_from_start = Duration(nanoseconds=int(1e9 / self.sample_rate * i)).to_msg()
-            point.velocities = [-1.0] * (len(JointStates.get_ordered_joint_names()))
-            point.accelerations = [-1.0] * len(JointStates.get_ordered_joint_names())
-            point.effort = [-1.0] * len(JointStates.get_ordered_joint_names())
+            point.velocities = [-1.0] * len(filtered_joint_names)
+            point.accelerations = [-1.0] * len(filtered_joint_names)
+            point.effort = [-1.0] * len(filtered_joint_names)
             trajectory_msg.points.append(point)
 
         print("Time for forward: ", time.time() - start)
