@@ -9,7 +9,6 @@ import torch
 import torch.nn.functional as F  # noqa
 import wandb
 import yaml
-from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -71,6 +70,8 @@ if __name__ == "__main__":
 
         # Now we are ready to use the configuration file
         params = config_params
+
+    params["distilled_decoder"] = True
 
     # Initialize the weights and biases logging
     run = wandb.init(entity="bitbots", project="ddlitlab-2024", config=params)
@@ -184,10 +185,6 @@ if __name__ == "__main__":
         else:
             logger.warning("No learning rate scheduler state found in the checkpoint")
 
-    # Create diffusion noise scheduler
-    scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2", clip_sample=False)
-    scheduler.config["num_train_timesteps"] = params["train_denoising_timesteps"]
-
     # Training loop
     for epoch in range(params["epochs"]):
         # Iterate over the dataset
@@ -203,33 +200,16 @@ if __name__ == "__main__":
             # due to the last batch being smaller
             bs = joint_targets.size(0)
 
-            # Normalize the target actions
-            joint_targets = normalizer.normalize(joint_targets)
-
             # Reset the gradients
             optimizer.zero_grad()
 
-            # Sample a random timestep for each trajectory in the batch
-            random_timesteps = (
-                torch.randint(0, scheduler.config["num_train_timesteps"], (joint_targets.size(0),)).long().to(device)
-            )
+            noise = torch.zeros_like(joint_targets).to(device)
 
-            # Sample gaussian noise to add to the entire trajectory
-            noise = torch.randn_like(joint_targets).to(device)
-
-            # Forward diffusion: Add noise to the entire trajectory at the random timestep
-            noisy_trajectory = scheduler.add_noise(joint_targets, noise, random_timesteps)
-
-            # Predict the error using the model
-            if args.decoder_pretraining:
-                predicted_traj = model.forward_with_context(
-                    [torch.randn((bs, 10, params["hidden_dim"]), device=device)], noisy_trajectory, random_timesteps
-                )
-            else:
-                predicted_traj = model(batch, noisy_trajectory, random_timesteps)
+            # Predict the joint trajectory
+            predicted_traj = model(batch, noise, torch.zeros(joint_targets.size(0), device=device))
 
             # Compute the loss
-            loss = F.mse_loss(predicted_traj, noise)
+            loss = F.mse_loss(predicted_traj, joint_targets)
 
             if i % 20 == 0:
                 pbar.set_postfix_str(

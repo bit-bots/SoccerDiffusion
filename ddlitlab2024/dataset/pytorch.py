@@ -63,7 +63,7 @@ class DDLITLab2024Dataset(Dataset):
         max_fps_video: int = 10,
         num_frames_video: int = 50,
         image_resolution: int = 480,
-        trajectory_stride: int = 1,
+        trajectory_stride: int = 10,
         num_joints: int = 20,
         use_images: bool = True,
         use_imu: bool = True,
