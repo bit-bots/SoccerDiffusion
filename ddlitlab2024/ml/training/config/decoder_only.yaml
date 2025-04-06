@@ -26,3 +26,4 @@ num_decoder_layers: 4
 distill_teacher_inference_steps: 30
 use_gamestate: False
 encoder_patch_size: 10
+use_robot_type: False

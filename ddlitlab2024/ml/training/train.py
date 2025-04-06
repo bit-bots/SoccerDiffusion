@@ -91,6 +91,7 @@ if __name__ == "__main__":
         use_joint_states=params["use_joint_states"],
         use_images=params["use_images"],
         use_game_state=params["use_gamestate"],
+        use_robot_type=True,
         image_resolution=params.get(
             "image_resolution", 480
         ),  # This parameter has been added later so we need to check if it is present
@@ -139,6 +140,7 @@ if __name__ == "__main__":
         num_decoder_layers=params["num_decoder_layers"],
         trajectory_prediction_length=params["trajectory_prediction_length"],
         use_gamestate=params["use_gamestate"],
+        use_robot_type=params["use_robot_type"],
         encoder_patch_size=params["encoder_patch_size"],
     ).to(device)
 
@@ -154,7 +156,7 @@ if __name__ == "__main__":
     # Load the model if a checkpoint is provided
     if args.checkpoint is not None:
         logger.info("Loading model from checkpoint")
-        model.load_state_dict(checkpoint["model_state_dict"])
+        model.load_state_dict(checkpoint["model_state_dict"], strict=False)
 
     # Load the pretrained decoder model if provided
     if args.pretrained_decoder is not None:
@@ -166,7 +168,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.AdamW(model.parameters(), lr=params["lr"])
 
     # Load the optimizer state if a checkpoint is provided
-    if args.checkpoint is not None:
+    if args.checkpoint is not None and False:
         if "optimizer_state_dict" in checkpoint:
             logger.info("Loading optimizer state from checkpoint")
             optimizer.load_state_dict(checkpoint["optimizer_state_dict"])

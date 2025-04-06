@@ -45,6 +45,7 @@ class DDLITLab2024Dataset(Dataset):
         joint_state: Optional[torch.Tensor]
         rotation: Optional[torch.Tensor]
         game_state: Optional[torch.Tensor]
+        robot_type: Optional[torch.Tensor]
         image_data: Optional[torch.Tensor]
         image_stamps: Optional[torch.Tensor]
 
@@ -70,6 +71,7 @@ class DDLITLab2024Dataset(Dataset):
         use_joint_states: bool = True,
         use_action_history: bool = True,
         use_game_state: bool = True,
+        use_robot_type: bool = False,
     ):
         # Initialize the database connection
         self.db_connection: sqlite3.Connection = db_connection if db_connection else connect_to_db()
@@ -92,6 +94,7 @@ class DDLITLab2024Dataset(Dataset):
         self.use_joint_states = use_joint_states
         self.use_action_history = use_action_history
         self.use_game_state = use_game_state
+        self.use_robot_type = use_robot_type
 
         # Print out metadata
         cursor = self.db_connection.cursor()
@@ -292,6 +295,19 @@ class DDLITLab2024Dataset(Dataset):
 
         return torch.tensor(int(game_state))
 
+    def query_robot_type(self, recording_id: int) -> torch.Tensor:
+        cursor = self.db_connection.cursor()
+        cursor.execute(
+            "SELECT robot_type FROM Recording WHERE _id = $1",
+            (recording_id,),
+        )
+        robot_type = cursor.fetchone()
+        robot_types = ["NAO6", "Wolfgang-OP"]
+        assert robot_type is not None, "The robot type is not set in the database"
+        assert robot_type[0] in robot_types, f"The robot type '{robot_type[0]}' is not supported"
+        robot_type_id = robot_types.index(robot_type[0])
+        return torch.tensor(robot_type_id)
+
     def __getitem__(self, idx: int) -> Result:
         # Find the recording that contains the sample
         for start_sample, end_sample, recording_id in self.sample_boundaries:
@@ -373,6 +389,11 @@ class DDLITLab2024Dataset(Dataset):
         else:
             game_state = None
 
+        if self.use_robot_type:
+            robot_type = self.query_robot_type(recording_id)
+        else:
+            robot_type = None
+
         return self.Result(
             joint_command=joint_command,
             joint_command_history=joint_command_history,
@@ -381,6 +402,7 @@ class DDLITLab2024Dataset(Dataset):
             image_stamps=image_stamps,
             rotation=robot_rotation,
             game_state=game_state,
+            robot_type=robot_type,
         )
 
     @staticmethod
@@ -395,6 +417,7 @@ class DDLITLab2024Dataset(Dataset):
             image_stamps=torch.stack([x.image_stamps for x in batch]) if batch[0].image_stamps is not None else None,
             rotation=torch.stack([x.rotation for x in batch]) if batch[0].rotation is not None else None,
             game_state=torch.tensor([x.game_state for x in batch]) if batch[0].game_state is not None else None,
+            robot_type=torch.tensor([x.robot_type for x in batch]) if batch[0].robot_type is not None else None,
         )
 
 
