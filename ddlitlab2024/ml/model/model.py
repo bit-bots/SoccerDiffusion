@@ -6,6 +6,7 @@ from ddlitlab2024.ml.model.encoder.game_state import GameStateEncoder
 from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType, image_sequence_encoder_factory
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 from ddlitlab2024.ml.model.encoder.joint import JointEncoder
+from ddlitlab2024.ml.model.encoder.robot_type import RobotTypeEncoder
 from ddlitlab2024.ml.model.misc import StepToken
 
 
@@ -33,6 +34,7 @@ class End2EndDiffusionTransformer(nn.Module):
         image_use_final_avgpool: bool,
         image_resolution: int,
         use_gamestate: bool,
+        use_robot_type: bool,
         num_decoder_layers: int,
         trajectory_prediction_length: int,
     ):
@@ -103,6 +105,9 @@ class End2EndDiffusionTransformer(nn.Module):
         # Gamestate encoder
         self.game_state_encoder = GameStateEncoder(hidden_dim) if use_gamestate else None
 
+        # Robot type encoder
+        self.robot_type_encoder = RobotTypeEncoder(hidden_dim) if use_robot_type else None
+
         # Define the decoder model for the diffusion denoising process
         self.diffusion_action_generator = DiffusionActionGenerator(
             num_joints=num_joints,
@@ -138,6 +143,8 @@ class End2EndDiffusionTransformer(nn.Module):
             context.append(self.image_sequence_encoder(input_data["image_data"]))
         if self.game_state_encoder is not None:
             context.append(self.game_state_encoder(input_data["game_state"]))
+        if self.robot_type_encoder is not None:
+            context.append(self.robot_type_encoder(input_data["robot_type"]))
 
         # TODO utilize image time stamps
 
