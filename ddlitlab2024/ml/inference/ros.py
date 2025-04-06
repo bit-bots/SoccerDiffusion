@@ -44,9 +44,9 @@ class Inference(Node):
             [rclpy.parameter.Parameter("use_sim_time", rclpy.Parameter.Type.BOOL, True)],
         )
 
-        self.reconstruct_imu = False
+        self.reconstruct_imu = True
         checkpoint_path = (
-            "../training/bh_01.pth"
+            "../training/bh_02.pth"
             # "../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
         )
         self.inference_denosing_timesteps = 30
@@ -62,9 +62,6 @@ class Inference(Node):
         self.joint_state_sub = self.create_subscription(JointState, "/joint_states", self.joint_state_callback, 10)
         self.img_sub = self.create_subscription(Image, "/camera/image_proc", self.img_callback, 10)
         self.gamestate_sub = self.create_subscription(GameState, "/gamestate", self.gamestate_callback, 10)
-        self.motor_command_sub = self.create_subscription(
-            JointCommand, "/DynamixelController/command", self.motor_command_callback, 10
-        )
         self.imu_sub = self.create_subscription(JointState, "/imu/data", self.imu_callback, 10)
 
         # Publisher for the output topic
@@ -84,7 +81,6 @@ class Inference(Node):
         self.joint_state_data = []
 
         # Joint command buffer
-        self.latest_motor_command: Optional[JointCommand] = None
         self.joint_command_data = []
 
         # Gamestate
@@ -146,6 +142,7 @@ class Inference(Node):
             trajectory_prediction_length=self.hyper_params["trajectory_prediction_length"],
             use_gamestate=self.hyper_params["use_gamestate"],
             encoder_patch_size=self.hyper_params["encoder_patch_size"],
+            robo
         ).to(device)
         self.normalizer = Normalizer(self.model.mean, self.model.std)
         self.model.load_state_dict(checkpoint["model_state_dict"])
@@ -176,9 +173,6 @@ class Inference(Node):
 
     def gamestate_callback(self, msg: GameState):
         self.latest_game_state = msg
-
-    def motor_command_callback(self, msg: JointCommand):
-        self.latest_motor_command = msg
 
     def imu_callback(self, msg: JointState):
         self.latest_imu = msg
@@ -222,14 +216,6 @@ class Inference(Node):
                     joint_state[i] = self.latest_joint_state.position[idx]
                 self.joint_state_data.append(joint_state)
 
-            if self.latest_motor_command is not None:
-                # Joint names are not in the correct order, so we need to reorder them
-                joint_state = torch.zeros(len(JointStates.get_ordered_joint_names()))
-                for i, joint_name in enumerate(JointStates.get_ordered_joint_names()):
-                    idx = self.latest_motor_command.joint_names.index(joint_name)
-                    joint_state[i] = self.latest_motor_command.positions[idx]
-                self.joint_command_data.append(joint_state)
-
             if self.reconstruct_imu:
                 # Due to a bug in the recordings of the bit-bots we can not use the imu data directly,
                 # but instead need to derive it from the tf tree
@@ -272,7 +258,6 @@ class Inference(Node):
             # Remove the oldest data from the buffers
             self.joint_state_data = self.joint_state_data[-self.hyper_params["joint_state_context_length"] :]
             self.imu_data = self.imu_data[-self.hyper_params["imu_context_length"] :]
-            self.joint_command_data = self.joint_command_data[-self.hyper_params["action_context_length"] :]
 
     @profile
     def step(self):
@@ -289,7 +274,8 @@ class Inference(Node):
                     torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device) + 3 * np.pi
                 )
                 % (2 * np.pi),  # torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device),
-                "game_state": torch.zeros(1, dtype=torch.long).to(device),
+                "game_state": torch.zeros(1, dtype=torch.long).to(device) + 2,
+                "robot_type": torch.zeros(1, dtype=torch.long).to(device) + 1,
             }
 
         print("Batch: ", batch["image_data"].shape)
@@ -343,6 +329,22 @@ class Inference(Node):
                 filtered_joint_idx.append(JointStates.get_ordered_joint_names().index(joint))
                 filtered_joint_names.append(joint)
 
+        # Add predicted trajectory to the buffer
+        for state in trajectory[0]:
+            self.joint_command_data.append(state.cpu() - np.pi)
+        self.joint_command_data = self.joint_command_data[-self.hyper_params["action_context_length"] :]
+
+
+
+        # Flip all the signs on the right side (joint name starts with R)
+        for i, joint_name in enumerate(filtered_joint_names):
+            if joint_name.startswith("R"):
+                trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
+
+            # Invert the hip yaw joint
+            if joint_name.endswith("HipYaw"):
+                trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
+
         # Publish the trajectory
         trajectory_msg = JointTrajectory()
         trajectory_msg.header.stamp = Time.to_msg(start_ros_time)
@@ -350,7 +352,7 @@ class Inference(Node):
         trajectory_msg.points = []
         for i in range(self.hyper_params["trajectory_prediction_length"]):
             point = JointTrajectoryPoint()
-            point.positions = trajectory[0, i, filtered_joint_idx].cpu().numpy() - np.pi
+            point.positions = ((trajectory[0, i, filtered_joint_idx].cpu().numpy()) % (2*np.pi)) - np.pi
             point.time_from_start = Duration(nanoseconds=int(1e9 / self.sample_rate * i)).to_msg()
             point.velocities = [-1.0] * len(filtered_joint_names)
             point.accelerations = [-1.0] * len(filtered_joint_names)
