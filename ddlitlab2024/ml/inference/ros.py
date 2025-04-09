@@ -46,7 +46,7 @@ class Inference(Node):
 
         self.reconstruct_imu = True
         checkpoint_path = (
-            "../training/bh_02.pth"
+            "../training/bh_03.pth"
             # "../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
         )
         self.inference_denosing_timesteps = 30
@@ -142,7 +142,7 @@ class Inference(Node):
             trajectory_prediction_length=self.hyper_params["trajectory_prediction_length"],
             use_gamestate=self.hyper_params["use_gamestate"],
             encoder_patch_size=self.hyper_params["encoder_patch_size"],
-            robo
+            use_robot_type=self.hyper_params.get("use_robot_type", False),
         ).to(device)
         self.normalizer = Normalizer(self.model.mean, self.model.std)
         self.model.load_state_dict(checkpoint["model_state_dict"])
@@ -274,8 +274,8 @@ class Inference(Node):
                     torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device) + 3 * np.pi
                 )
                 % (2 * np.pi),  # torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device),
-                "game_state": torch.zeros(1, dtype=torch.long).to(device) + 2,
-                "robot_type": torch.zeros(1, dtype=torch.long).to(device) + 1,
+                "game_state": torch.zeros(1, dtype=torch.long).to(device) + 3,
+                "robot_type": torch.zeros(1, dtype=torch.long).to(device) + 0,
             }
 
         print("Batch: ", batch["image_data"].shape)
@@ -331,19 +331,36 @@ class Inference(Node):
 
         # Add predicted trajectory to the buffer
         for state in trajectory[0]:
-            self.joint_command_data.append(state.cpu() - np.pi)
+             self.joint_command_data.append(state.cpu() - np.pi)
         self.joint_command_data = self.joint_command_data[-self.hyper_params["action_context_length"] :]
-
 
 
         # Flip all the signs on the right side (joint name starts with R)
         for i, joint_name in enumerate(filtered_joint_names):
-            if joint_name.startswith("R"):
-                trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
+           # Offset the elbows by 90 degrees
+           if joint_name.endswith("Elbow"):
+               trajectory[0, :, filtered_joint_idx[i]] = (trajectory[0, :, filtered_joint_idx[i]] - np.pi / 2) % (
+                   2 * np.pi
+               )
 
-            # Invert the hip yaw joint
-            if joint_name.endswith("HipYaw"):
-                trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
+           # Offset the shoulder pitch by 90 degrees
+           if joint_name.endswith("ShoulderPitch"):
+               trajectory[0, :, filtered_joint_idx[i]] = (trajectory[0, :, filtered_joint_idx[i]] - np.pi / 2) % (
+                   2 * np.pi
+               )
+
+           if joint_name.startswith("R"):
+               trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
+
+
+           # Invert the hip pitch joint
+           if joint_name.endswith("HipPitch"):
+               trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
+
+           # Invert the left shoulder roll joint
+           if joint_name == "LShoulderRoll":
+               trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
+
 
         # Publish the trajectory
         trajectory_msg = JointTrajectory()
@@ -352,7 +369,7 @@ class Inference(Node):
         trajectory_msg.points = []
         for i in range(self.hyper_params["trajectory_prediction_length"]):
             point = JointTrajectoryPoint()
-            point.positions = ((trajectory[0, i, filtered_joint_idx].cpu().numpy()) % (2*np.pi)) - np.pi
+            point.positions = trajectory[0, i, filtered_joint_idx].cpu().numpy() - np.pi
             point.time_from_start = Duration(nanoseconds=int(1e9 / self.sample_rate * i)).to_msg()
             point.velocities = [-1.0] * len(filtered_joint_names)
             point.accelerations = [-1.0] * len(filtered_joint_names)
