@@ -334,34 +334,6 @@ class Inference(Node):
              self.joint_command_data.append(state.cpu() - np.pi)
         self.joint_command_data = self.joint_command_data[-self.hyper_params["action_context_length"] :]
 
-
-        # Flip all the signs on the right side (joint name starts with R)
-        for i, joint_name in enumerate(filtered_joint_names):
-           # Offset the elbows by 90 degrees
-           if joint_name.endswith("Elbow"):
-               trajectory[0, :, filtered_joint_idx[i]] = (trajectory[0, :, filtered_joint_idx[i]] - np.pi / 2) % (
-                   2 * np.pi
-               )
-
-           # Offset the shoulder pitch by 90 degrees
-           if joint_name.endswith("ShoulderPitch"):
-               trajectory[0, :, filtered_joint_idx[i]] = (trajectory[0, :, filtered_joint_idx[i]] - np.pi / 2) % (
-                   2 * np.pi
-               )
-
-           if joint_name.startswith("R"):
-               trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
-
-
-           # Invert the hip pitch joint
-           if joint_name.endswith("HipPitch"):
-               trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
-
-           # Invert the left shoulder roll joint
-           if joint_name == "LShoulderRoll":
-               trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
-
-
         # Publish the trajectory
         trajectory_msg = JointTrajectory()
         trajectory_msg.header.stamp = Time.to_msg(start_ros_time)
