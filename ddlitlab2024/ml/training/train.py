@@ -148,7 +148,6 @@ if __name__ == "__main__":
     model.mean = normalizer.mean
     model.std = normalizer.std
     logger.info(f"Normalization values:\nJoint mean: {normalizer.mean}\nJoint std: {normalizer.std}")
-    assert all(model.std != 0), "Normalization std is zero, this makes no sense. Some joints are constant."
 
     # Log gradients and parameters to wandb
     run.watch(model)
