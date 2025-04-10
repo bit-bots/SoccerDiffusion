@@ -1,3 +1,4 @@
+import json
 import time
 from threading import Lock
 from typing import Optional
@@ -7,37 +8,41 @@ import numpy as np
 import rclpy
 import torch
 import torch.nn.functional as F  # noqa
-from bitbots_msgs.msg import JointCommand
 from bitbots_tf_buffer import Buffer
 from cv_bridge import CvBridge
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from game_controller_hl_interfaces.msg import GameState
-from torchvision.transforms import v2
 from profilehooks import profile
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.duration import Duration
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 from rclpy.time import Time
-from sensor_msgs.msg import Image, JointState, Imu
+from sensor_msgs.msg import Image, Imu, JointState
+from torchvision.transforms import v2
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from ddlitlab2024 import DEFAULT_RESAMPLE_RATE_HZ
-from ddlitlab2024.dataset.models import JointStates
+from ddlitlab2024.dataset.converters.game_state_converter.bit_bots_game_state_converter import GameStateMessage
+from ddlitlab2024.dataset.models import JointStates, RobotState
 from ddlitlab2024.dataset.pytorch import Normalizer
 from ddlitlab2024.ml.model import End2EndDiffusionTransformer
 from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
-
 from ddlitlab2024.utils.utils import quats_to_5d
 
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+ROBOT_TYPES = ["NAO6", "Wolfgang-OP"]
+ROBOT = ROBOT_TYPES[1]
+
 
 class Inference(Node):
     def __init__(self, node_name, context):
         super().__init__(node_name, context=context)
+        self.is_nao = ROBOT != "Wolfgang-OP"
+
         # Activate sim time
         self.get_logger().info("Activate sim time")
         self.set_parameters(
@@ -46,9 +51,9 @@ class Inference(Node):
 
         self.reconstruct_imu = True
         checkpoint_path = (
-            "../training/bh_02.pth"
-            # "../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
-        )
+            "/srv/ssd_nvm/projects/ddlitlab2024/checkpoints/trajectory_transformer_model_low_res_512.pth"
+            # "/srv/ssd_nvm/projects/ddlitlab2024/checkpoints/trajectory_transformer_model_go_distill.pth"
+            )
         self.inference_denosing_timesteps = 30
 
         # Params
@@ -57,6 +62,7 @@ class Inference(Node):
         self.get_logger().info(f"Loading checkpoint '{checkpoint_path}'")
         checkpoint = torch.load(checkpoint_path, weights_only=True, map_location=torch.device("cpu"))
         self.hyper_params = checkpoint["hyperparams"]
+        self.get_logger().info(f"Loaded hyperparameters: \n{json.dumps(self.hyper_params, indent=2)}")
 
         # Subscribe to all the input topics
         self.joint_state_sub = self.create_subscription(JointState, "/joint_states", self.joint_state_callback, 10)
@@ -85,6 +91,24 @@ class Inference(Node):
 
         # Gamestate
         self.latest_game_state = None
+        self.latest_robot_state = RobotState.STOPPED
+
+        # Remove unused extra nao joints
+        # if self.is_nao:
+        extra_nao_joints = [
+            JointStates.l_elbow_yaw.name,
+            JointStates.r_elbow_yaw.name,
+        ]
+        joint_names = JointStates.get_ordered_joint_names()
+        filtered_joint_names = [name for name in joint_names if name not in extra_nao_joints]
+        filtered_joint_idx = list(map(lambda name: joint_names.index(name), filtered_joint_names))
+
+        self.joint_names = filtered_joint_names
+        self.joint_idx = filtered_joint_idx
+        # else:
+        #     # Wolfgang-OP
+        #     self.joint_names = JointStates.get_ordered_joint_names()
+        #     self.joint_idx = range(len(self.joint_names))
 
         # Add default values to the buffers
         self.image_embeddings = [
@@ -100,7 +124,7 @@ class Inference(Node):
                 else 4
             )
         ] * self.hyper_params["imu_context_length"]
-        self.joint_state_data = [torch.zeros(len(JointStates.get_ordered_joint_names()))] * self.hyper_params[
+        self.joint_state_data = [torch.zeros(len(self.joint_names))] * self.hyper_params[
             "joint_state_context_length"
         ]
         self.joint_command_data = [torch.zeros(self.hyper_params["num_joints"])] * self.hyper_params[
@@ -142,7 +166,7 @@ class Inference(Node):
             trajectory_prediction_length=self.hyper_params["trajectory_prediction_length"],
             use_gamestate=self.hyper_params["use_gamestate"],
             encoder_patch_size=self.hyper_params["encoder_patch_size"],
-            robo
+            use_robot_type=self.hyper_params.get("use_robot_type", False),
         ).to(device)
         self.normalizer = Normalizer(self.model.mean, self.model.std)
         self.model.load_state_dict(checkpoint["model_state_dict"])
@@ -173,6 +197,26 @@ class Inference(Node):
 
     def gamestate_callback(self, msg: GameState):
         self.latest_game_state = msg
+
+        # copied from bit_bots_game_state_converter
+        if msg.penalized:
+            robot_state = RobotState.STOPPED
+        else:
+            match msg.game_state:
+                case GameStateMessage.INITIAL:
+                    robot_state = RobotState.STOPPED
+                case GameStateMessage.READY:
+                    robot_state = RobotState.POSITIONING
+                case GameStateMessage.SET:
+                    robot_state = RobotState.STOPPED
+                case GameStateMessage.PLAYING:
+                    robot_state = RobotState.PLAYING
+                case GameStateMessage.FINISHED:
+                    robot_state = RobotState.STOPPED
+                case _:
+                    robot_state = RobotState.UNKNOWN
+
+        self.latest_robot_state = robot_state
 
     def imu_callback(self, msg: JointState):
         self.latest_imu = msg
@@ -208,12 +252,14 @@ class Inference(Node):
     def update_buffers(self):
         with self.data_lock:
             # First we want to fill the buffers
-            if self.latest_joint_state is not None and False:
+            if self.latest_joint_state is not None and self.hyper_params["use_joint_states"]:
                 # Joint names are not in the correct order, so we need to reorder them
-                joint_state = torch.zeros(len(JointStates.get_ordered_joint_names()))
-                for i, joint_name in enumerate(JointStates.get_ordered_joint_names()):
+                joint_state = torch.zeros(len(self.joint_names))
+
+                for i, joint_name in enumerate(self.joint_names):
                     idx = self.latest_joint_state.name.index(joint_name)
                     joint_state[i] = self.latest_joint_state.position[idx]
+
                 self.joint_state_data.append(joint_state)
 
             if self.reconstruct_imu:
@@ -266,17 +312,21 @@ class Inference(Node):
         # Prepare the data for inference
         with self.data_lock:
             batch = {
-                #"joint_state": (torch.stack(list(self.joint_state_data), dim=0).unsqueeze(0).to(device) + 3 * np.pi)
-                #% (2 * np.pi),
                 "image_data": torch.stack(list(self.image_embeddings), dim=0).unsqueeze(0).to(device),
                 "rotation": torch.stack(list(self.imu_data), dim=0).unsqueeze(0).to(device),
                 "joint_command_history": (
                     torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device) + 3 * np.pi
                 )
                 % (2 * np.pi),  # torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device),
-                "game_state": torch.zeros(1, dtype=torch.long).to(device) + 2,
-                "robot_type": torch.zeros(1, dtype=torch.long).to(device) + 1,
+                # "game_state": torch.tensor([int(self.latest_robot_state)]).to(device),
+                "game_state": torch.zeros(1, dtype=torch.long).to(device),
             }
+            if self.hyper_params.get("use_robot_type", False):
+                batch["robot_type"] = torch.zeros(1, dtype=torch.long).to(device) + ROBOT_TYPES.index(ROBOT)
+            if self.hyper_params.get("use_joint_states", False):
+                batch["joint_state"] = torch.stack(list(self.joint_state_data), dim=0).unsqueeze(0).to(
+                    device
+                ) + 3 * np.pi % (2 * np.pi)
 
         print("Batch: ", batch["image_data"].shape)
 
@@ -314,49 +364,35 @@ class Inference(Node):
                     trajectory = self.scheduler.step(noise_pred, t, trajectory).prev_sample
 
         # Undo the normalization
-        #trajectory = self.normalizer.denormalize(trajectory)
-
-        # Remove unused joints
-        remove_joints = [
-            "LElbowYaw",
-            "RElbowYaw",
-        ]
-
-        filtered_joint_idx = []
-        filtered_joint_names = []
-        for joint in JointStates.get_ordered_joint_names():
-            if joint not in remove_joints:
-                filtered_joint_idx.append(JointStates.get_ordered_joint_names().index(joint))
-                filtered_joint_names.append(joint)
+        trajectory = self.normalizer.denormalize(trajectory)
 
         # Add predicted trajectory to the buffer
         for state in trajectory[0]:
             self.joint_command_data.append(state.cpu() - np.pi)
         self.joint_command_data = self.joint_command_data[-self.hyper_params["action_context_length"] :]
 
-
-
         # Flip all the signs on the right side (joint name starts with R)
-        for i, joint_name in enumerate(filtered_joint_names):
-            if joint_name.startswith("R"):
-                trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
+        # for i, joint_name in enumerate(filtered_joint_names):
+        #     if joint_name.startswith("R"):
+        #         trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
 
-            # Invert the hip yaw joint
-            if joint_name.endswith("HipYaw"):
-                trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
+        #     # Invert the hip yaw joint
+        #     if joint_name.endswith("HipYaw"):
+        #         trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
 
         # Publish the trajectory
         trajectory_msg = JointTrajectory()
         trajectory_msg.header.stamp = Time.to_msg(start_ros_time)
-        trajectory_msg.joint_names = filtered_joint_names
+        trajectory_msg.joint_names = self.joint_names
         trajectory_msg.points = []
         for i in range(self.hyper_params["trajectory_prediction_length"]):
             point = JointTrajectoryPoint()
-            point.positions = ((trajectory[0, i, filtered_joint_idx].cpu().numpy()) % (2*np.pi)) - np.pi
+            # point.positions = ((trajectory[0, i, self.joint_idx].cpu().numpy()) % (2 * np.pi)) - np.pi
+            point.positions = ((trajectory[0, i].cpu().numpy()) % (2 * np.pi)) - np.pi
             point.time_from_start = Duration(nanoseconds=int(1e9 / self.sample_rate * i)).to_msg()
-            point.velocities = [-1.0] * len(filtered_joint_names)
-            point.accelerations = [-1.0] * len(filtered_joint_names)
-            point.effort = [-1.0] * len(filtered_joint_names)
+            point.velocities = [-1.0] * len(self.joint_names)
+            point.accelerations = [-1.0] * len(self.joint_names)
+            point.effort = [-1.0] * len(self.joint_names)
             trajectory_msg.points.append(point)
 
         print("Time for forward: ", time.time() - start)
