@@ -67,6 +67,7 @@ class DDLITLab2024Dataset(Dataset):
         trajectory_stride: int = 10,
         num_joints: int = 20,
         use_images: bool = True,
+        use_image_embeddings: bool = True,
         use_imu: bool = True,
         use_joint_states: bool = True,
         use_action_history: bool = True,
@@ -90,6 +91,7 @@ class DDLITLab2024Dataset(Dataset):
         self.num_joints = num_joints
         self.joint_names = JointStates.get_ordered_joint_names()
         self.use_images = use_images
+        self.use_image_embeddings = use_image_embeddings
         self.use_imu = use_imu
         self.use_joint_states = use_joint_states
         self.use_action_history = use_action_history
@@ -178,10 +180,12 @@ class DDLITLab2024Dataset(Dataset):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         # Get the image data
         cursor = self.db_connection.cursor()
+
+        col = "embedding" if self.use_image_embeddings else "data"
         cursor.execute(
             # Select the last num_samples images before the current time stamp
             # and order them by time stamp in ascending order
-            "SELECT stamp, data FROM Image "
+            f"SELECT stamp, {col} FROM Image "
             "WHERE recording_id = $1 AND stamp BETWEEN $2 - $3 AND $2 ORDER BY stamp ASC;",
             (recording_id, end_time_stamp, context_len),
         )
@@ -206,22 +210,35 @@ class DDLITLab2024Dataset(Dataset):
             ]
         )
 
-        # Get the raw image data
-        for stamp, data in response:
-            # Deserialize the image data
-            image = np.frombuffer(data, dtype=np.uint8).reshape(480, 480, 3)
-            # Resize the image
-            image = cv2.resize(image, (resolution, resolution), interpolation=cv2.INTER_AREA)
-            # Apply the preprocessing pipeline
-            image = preprocessing(image)
-            # Append to the list
-            image_data.append(image)
-            stamps.append(stamp)
+        if self.use_image_embeddings:
+            # Decode image embeddings
+            for stamp, data in response:
+                data = torch.tensor(np.frombuffer(data, dtype=np.float32).reshape(-1))
+                assert data.shape[0] == 384, "Embedding size might be wrong"
+                image_data.append(data)
+                stamps.append(stamp)
+        else:
+            # Decode the raw image data
+            for stamp, data in response:
+                # Deserialize the image data
+                image = np.frombuffer(data, dtype=np.uint8).reshape(480, 480, 3)
+                # Resize the image
+                image = cv2.resize(image, (resolution, resolution), interpolation=cv2.INTER_AREA)
+                # Apply the preprocessing pipeline
+                image = preprocessing(image)
+                # Append to the list
+                image_data.append(image)
+                stamps.append(stamp)
 
         # Apply zero padding if necessary
         if len(image_data) < num_frames:
+            if self.use_image_embeddings:
+                single_pad = torch.zeros(384, dtype=torch.float32)
+            else:
+                single_pad = torch.zeros((3, resolution, resolution), dtype=torch.float32)
+
             image_data = [
-                torch.zeros((3, resolution, resolution), dtype=torch.float32)
+                single_pad
                 for _ in range(num_frames - len(image_data))
             ] + image_data
             stamps = [end_time_stamp - context_len for _ in range(num_frames - len(stamps))] + stamps
@@ -343,12 +360,15 @@ class DDLITLab2024Dataset(Dataset):
             # Some sanity checks
             assert all([stamp >= image_stamp for image_stamp in image_stamps]), "The image data is not synchronized"
             assert len(image_stamps) == self.num_frames_video, "The image data is not the correct length"
-            assert image_data.shape == (
-                self.num_frames_video,
-                3,
-                self.image_resolution,
-                self.image_resolution,
-            ), "The image data has the wrong shape"
+            if self.use_image_embeddings:
+                assert image_data.shape[0] == self.num_frames_video
+            else:
+                assert image_data.shape == (
+                    self.num_frames_video,
+                    3,
+                    self.image_resolution,
+                    self.image_resolution,
+                ), "The image data has the wrong shape"
             assert (
                 image_stamps[0] >= stamp - (self.num_frames_video + 1) / self.max_fps_video
             ), "The image data is not synchronized"
@@ -428,7 +448,7 @@ class Normalizer:
 
     @classmethod
     def fit(cls, data: torch.Tensor):
-        return cls(data.mean(dim=0), data.std(dim=0))
+        return cls(data.mean(dim=0), data.std(dim=0) + 1e-5)
 
     def normalize(self, data: torch.Tensor):
         return (data - self.mean) / self.std

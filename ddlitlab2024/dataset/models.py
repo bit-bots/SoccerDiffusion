@@ -111,6 +111,9 @@ class Image(Base):
     # The image data should contain the image as bytes using an rgb8 format (3 channels) and uint8 type.
     # and should be of size (img_width, img_height) as specified in the recording (default 480x480)
     data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    
+    # A place where DINOv2 embeddings of the images can be stored
+    embedding: Mapped[bytes] = mapped_column(LargeBinary, nullable=True)
 
     recording: Mapped["Recording"] = relationship("Recording", back_populates="images")
 

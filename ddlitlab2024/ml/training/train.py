@@ -89,6 +89,9 @@ if __name__ == "__main__":
         use_imu=params["use_imu"],
         use_joint_states=params["use_joint_states"],
         use_images=params["use_images"],
+        use_image_embeddings=params.get(
+            "use_image_embeddings", False
+        ),
         use_game_state=params["use_gamestate"],
         use_robot_type=params["use_robot_type"],
         image_resolution=params.get(
@@ -147,7 +150,7 @@ if __name__ == "__main__":
     model.mean = normalizer.mean
     model.std = normalizer.std
     logger.info(f"Normalization values:\nJoint mean: {normalizer.mean}\nJoint std: {normalizer.std}")
-    assert all(model.std != 0), "Normalization std is zero, this makes no sense. Some joints are constant."
+    #assert all(model.std != 0), "Normalization std is zero, this makes no sense. Some joints are constant."
 
     # Log gradients and parameters to wandb
     run.watch(model)

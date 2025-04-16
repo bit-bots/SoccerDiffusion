@@ -17,6 +17,7 @@ class ImageEncoderType(Enum):
     RESNET50 = "resnet50"
     SWIN_TRANSFORMER_TINY = "swin_transformer_tiny"
     SWIN_TRANSFORMER_SMALL = "swin_transformer_small"
+    DINOV2 = "dinov2"
 
 
 class SequenceEncoderType(Enum):
@@ -44,7 +45,7 @@ class AbstractImageEncoder(nn.Module):
         """
         # Squash the sequence dimension together with the batch dimension
         images = x.view(-1, *x.shape[2:])
-
+        
         # Encode the images into tokens
         tokens = self.encoder(images)
 
@@ -100,6 +101,16 @@ class SwinTransformerImageEncoder(AbstractImageEncoder):
         self.encoder.head = nn.Linear(self.encoder.head.in_features, hidden_dim)
 
 
+class DinoImageEncoder(AbstractImageEncoder):
+    """
+    Dino image encoder (dummy because we use precomputed embeddings for this)
+    """
+
+    def __init__(self, hidden_dim: int):
+        super().__init__()
+        self.encoder = nn.Linear(384, hidden_dim)
+
+
 class TransformerImageSequenceEncoder(nn.Module):
     """
     Transformer image sequence encoder.
@@ -137,6 +148,8 @@ def image_encoder_factory(
         return ResNetImageEncoder(encoder_type, hidden_dim, use_final_avgpool, resolution)
     if encoder_type in [ImageEncoderType.SWIN_TRANSFORMER_TINY, ImageEncoderType.SWIN_TRANSFORMER_SMALL]:
         return SwinTransformerImageEncoder(encoder_type, hidden_dim)
+    if encoder_type in [ImageEncoderType.DINOV2]:
+        return DinoImageEncoder(hidden_dim)
     else:
         raise ValueError(f"Invalid image encoder type: {encoder_type}")
 
