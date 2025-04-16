@@ -1,14 +1,14 @@
 hidden_dim: 1024
 action_context_length: 100
 trajectory_prediction_length: 10
-epochs: 100
+epochs: 15
 batch_size: 32
 lr: 2.e-5
 train_denoising_timesteps: 1000
 image_context_length: 10
 imu_context_length: 100
 joint_state_context_length: 100
-num_normalization_samples: 10
+num_normalization_samples: 1000
 num_joints: 22
 use_action_history: True
 num_action_history_encoder_layers: 4
