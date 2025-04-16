@@ -1,7 +1,8 @@
 from ddlitlab2024.dataset.converters.converter import Converter
-from ddlitlab2024.dataset.imports.data import InputData, ModelData, joints_dict_from_msg_data
+from ddlitlab2024.dataset.imports.data import InputData, ModelData
 from ddlitlab2024.dataset.models import JointCommands, JointStates, Recording, Rotation
 from ddlitlab2024.dataset.resampling.previous_interpolation_resampler import PreviousInterpolationResampler
+from ddlitlab2024.utils.utils import shift_radian_to_positive_range
 
 
 class SyncedDataConverter(Converter):
@@ -39,14 +40,20 @@ class SyncedDataConverter(Converter):
             w=msg.w,
         )
 
-    def _create_joint_states(self, msg, sampling_timestamp: float, recording: Recording) -> JointStates:
-        joint_states_data = list(zip(msg.name, msg.position))
+    def _create_joint_states(self, joint_states_data, sampling_timestamp: float, recording: Recording) -> JointStates:
+        shifted_joint_states = {}
 
-        return JointStates(
-            stamp=sampling_timestamp, recording=recording, **joints_dict_from_msg_data(joint_states_data)
-        )
+        for joint, position in joint_states_data.items():
+            shifted_joint_states[joint] = shift_radian_to_positive_range(position)
+
+        return JointStates(stamp=sampling_timestamp, recording=recording, **shifted_joint_states)
 
     def _create_joint_commands(
         self, joint_commands_data, sampling_timestamp: float, recording: Recording
     ) -> JointCommands:
-        return JointCommands(stamp=sampling_timestamp, recording=recording, **joint_commands_data)
+        shifted_joint_commands = {}
+
+        for joint, command in joint_commands_data.items():
+            shifted_joint_commands[joint] = shift_radian_to_positive_range(command)
+
+        return JointCommands(stamp=sampling_timestamp, recording=recording, **shifted_joint_commands)
