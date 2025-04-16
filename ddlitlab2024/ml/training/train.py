@@ -28,7 +28,6 @@ tqdm = partial(tqdm, dynamic_ncols=True)
 if __name__ == "__main__":
     logger.info("Starting training")
     logger.info(f"Using device {device}")
-    # TODO wandb
 
     # Parse the command line arguments
     parser = argparse.ArgumentParser(description="Train the model")
