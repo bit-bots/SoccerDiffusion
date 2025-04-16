@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ddlitlab2024.dataset.models import GameState, Image, JointCommands, JointStates, Recording, Rotation
-from ddlitlab2024.utils.utils import camelcase_to_snakecase, shift_radian_to_positive_range
+from ddlitlab2024.utils.utils import camelcase_to_snakecase
 
 
 def joints_dict_from_msg_data(joints_data: list[tuple[str, float]]) -> dict[str, float]:
@@ -10,8 +10,7 @@ def joints_dict_from_msg_data(joints_data: list[tuple[str, float]]) -> dict[str,
 
     for name, position in joints_data:
         key = camelcase_to_snakecase(name)
-        value = shift_radian_to_positive_range(position)
-        joints_dict[key] = value
+        joints_dict[key] = position
 
     return joints_dict
 
@@ -28,9 +27,10 @@ class ImportMetadata:
 @dataclass
 class InputData:
     image: Any = None
+    lower_image: Any = None
     game_state: Any = None
-    joint_state: Any = None
     rotation: Any = None
+    _joint_state: Any = None
 
     # as we are not always sending joint commands for all joints at once
     # we need to separate them here, to enable resampling on a per joint basis
@@ -39,7 +39,9 @@ class InputData:
     r_shoulder_roll_command: Any = None
     l_shoulder_roll_command: Any = None
     r_elbow_command: Any = None
+    r_elbow_yaw_command: Any = 0.0  # Default
     l_elbow_command: Any = None
+    l_elbow_yaw_command: Any = 0.0  # Default
     r_hip_yaw_command: Any = None
     l_hip_yaw_command: Any = None
     r_hip_roll_command: Any = None
@@ -56,6 +58,16 @@ class InputData:
     head_tilt_command: Any = None
 
     @property
+    def joint_state(self):
+        return self._joint_state
+
+    @joint_state.setter
+    def joint_state(self, msg):
+        joint_states_data = list(zip(msg.name, msg.position))
+
+        self._joint_state = joints_dict_from_msg_data(joint_states_data)
+
+    @property
     def joint_command(self):
         return {
             "r_shoulder_pitch": self.r_shoulder_pitch_command,
@@ -63,7 +75,9 @@ class InputData:
             "r_shoulder_roll": self.r_shoulder_roll_command,
             "l_shoulder_roll": self.l_shoulder_roll_command,
             "r_elbow": self.r_elbow_command,
+            "r_elbow_yaw": self.r_elbow_yaw_command,
             "l_elbow": self.l_elbow_command,
+            "l_elbow_yaw": self.l_elbow_yaw_command,
             "r_hip_yaw": self.r_hip_yaw_command,
             "l_hip_yaw": self.l_hip_yaw_command,
             "r_hip_roll": self.r_hip_roll_command,
@@ -105,4 +119,5 @@ class ModelData:
         self.joint_states.extend(other.joint_states)
         self.joint_commands.extend(other.joint_commands)
         self.images.extend(other.images)
+        self.rotations.extend(other.rotations)
         return self

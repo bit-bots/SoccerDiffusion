@@ -211,3 +211,6 @@ ENV/
 
 # Wandb Logs
 ddlitlab2024/ml/training/wandb/
+
+# Input data
+input/
