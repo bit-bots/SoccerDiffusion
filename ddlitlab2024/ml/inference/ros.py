@@ -20,6 +20,7 @@ from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import Image, Imu, JointState
 from torchvision.transforms import v2
+from PIL import Image as PILImage
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from ddlitlab2024 import DEFAULT_RESAMPLE_RATE_HZ
@@ -30,6 +31,7 @@ from ddlitlab2024.ml.model import End2EndDiffusionTransformer
 from ddlitlab2024.ml.model.encoder.image import ImageEncoderType, SequenceEncoderType
 from ddlitlab2024.ml.model.encoder.imu import IMUEncoder
 from ddlitlab2024.utils.utils import quats_to_5d
+from ddlitlab2024.dataset.dino import get_transform, load_dino_model, extract_cls_embeddings
 
 # Check if CUDA is available and set the device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -49,9 +51,9 @@ class Inference(Node):
             [rclpy.parameter.Parameter("use_sim_time", rclpy.Parameter.Type.BOOL, True)],
         )
 
-        self.reconstruct_imu = True
+        self.reconstruct_imu = False
         checkpoint_path = (
-            "/srv/ssd_nvm/projects/ddlitlab2024/checkpoints/trajectory_transformer_model_low_res_512.pth"
+            "/home/florian/ddlitlab/ddlitlab_repo/ddlitlab2024/ml/training/dino_test.pth"
             # "/srv/ssd_nvm/projects/ddlitlab2024/checkpoints/trajectory_transformer_model_go_distill.pth"
             )
         self.inference_denosing_timesteps = 30
@@ -113,7 +115,7 @@ class Inference(Node):
         # Add default values to the buffers
         self.image_embeddings = [
             torch.zeros(
-                3, self.hyper_params.get("image_resolution", 480), self.hyper_params.get("image_resolution", 480)
+                384
             )
         ] * self.hyper_params["image_context_length"]
         self.imu_data = [
@@ -172,6 +174,10 @@ class Inference(Node):
         self.model.load_state_dict(checkpoint["model_state_dict"])
         self.model.eval()
         print(self.normalizer.mean)
+
+        # Load the DINO embedding model
+        self.dino_model = load_dino_model(device)
+        self.dino_model.eval()
 
         # Create diffusion noise scheduler
         self.get_logger().info("Create diffusion noise scheduler")
@@ -232,21 +238,13 @@ class Inference(Node):
                 # Deserialize the image
                 img = self.cv_bridge.imgmsg_to_cv2(self.latest_image, desired_encoding="rgb8")
 
-                # Resize the image
-                img = cv2.resize(img, [self.hyper_params.get("image_resolution", 480)] * 2)
-
-                preprocessing = v2.Compose(
-                    [
-                        v2.ToImage(),
-                        v2.ToDtype(torch.float32, scale=True),
-                        v2.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
-                    ]
-                )
-
                 # Convert the image to a tensor and normalize it
-                img = preprocessing(img)
+                img = get_transform()(PILImage.fromarray(img)).to(device)
 
-                self.image_embeddings.append(img)
+                # Embed the image
+                emb = torch.tensor(extract_cls_embeddings(self.dino_model, img.unsqueeze(0), device)[0])
+
+                self.image_embeddings.append(emb) #torch.rand(384))# emb)
         self.image_embeddings = self.image_embeddings[-self.hyper_params["image_context_length"] :]
 
     def update_buffers(self):
@@ -331,7 +329,7 @@ class Inference(Node):
         print("Batch: ", batch["image_data"].shape)
 
         # Perform the denoising process
-        trajectory = torch.zeros(
+        trajectory = torch.rand(
             1, self.hyper_params["trajectory_prediction_length"], self.hyper_params["num_joints"]
         ).to(device)
 
@@ -388,7 +386,7 @@ class Inference(Node):
         for i in range(self.hyper_params["trajectory_prediction_length"]):
             point = JointTrajectoryPoint()
             # point.positions = ((trajectory[0, i, self.joint_idx].cpu().numpy()) % (2 * np.pi)) - np.pi
-            point.positions = ((trajectory[0, i].cpu().numpy()) % (2 * np.pi)) - np.pi
+            point.positions = ((trajectory[0, i, self.joint_idx].cpu().numpy()) % (2 * np.pi)) - np.pi
             point.time_from_start = Duration(nanoseconds=int(1e9 / self.sample_rate * i)).to_msg()
             point.velocities = [-1.0] * len(self.joint_names)
             point.accelerations = [-1.0] * len(self.joint_names)
