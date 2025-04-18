@@ -65,7 +65,7 @@ def main(db_path, batch_size):
     cursor = conn.cursor()
 
     # Get total number of images without embeddings
-    print("🔍 Counting images without embeddings...")
+    print("🔍 Counting images...")
     cursor.execute("SELECT COUNT(*) FROM Image")
     total_unprocessed = cursor.fetchone()[0]
 
