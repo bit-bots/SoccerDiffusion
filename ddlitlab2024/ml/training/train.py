@@ -75,6 +75,9 @@ if __name__ == "__main__":
     # Initialize the weights and biases logging
     run = wandb.init(entity="bitbots", project="ddlitlab-2024", config=params)
 
+    # Setup AMP
+    scaler = torch.GradScaler(device)
+
     # Load the dataset
     logger.info("Create dataset objects")
     dataset = DDLITLab2024Dataset(
@@ -226,25 +229,27 @@ if __name__ == "__main__":
             noisy_trajectory = scheduler.add_noise(joint_targets, noise, random_timesteps)
 
             # Predict the error using the model
-            if args.decoder_pretraining:
-                predicted_traj = model.forward_with_context(
-                    [torch.randn((bs, 10, params["hidden_dim"]), device=device)], noisy_trajectory, random_timesteps
-                )
-            else:
-                predicted_traj = model(batch, noisy_trajectory, random_timesteps)
+            with torch.autocast(device):
+                if args.decoder_pretraining:
+                    predicted_traj = model.forward_with_context(
+                        [torch.randn((bs, 10, params["hidden_dim"]), device=device)], noisy_trajectory, random_timesteps
+                    )
+                else:
+                    predicted_traj = model(batch, noisy_trajectory, random_timesteps)
 
-            # Compute the loss
-            loss = F.mse_loss(predicted_traj, noise)
+                loss = F.mse_loss(predicted_traj, noise)
 
+            # Log to wandb at regular intervals (not every iteration to avoid synchronization events)
             if i % 20 == 0:
                 pbar.set_postfix_str(
                     f"Epoch {epoch}, Loss: {loss.item():.05f}, LR: {lr_scheduler.get_last_lr()[0]:0.7f}"
                 )
                 run.log({"loss": loss.item(), "lr": lr_scheduler.get_last_lr()[0]}, step=(i + epoch * len(dataloader)))
 
-            # Backpropagation and optimization
-            loss.backward()
-            optimizer.step()
+            # Backpropagation
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
             lr_scheduler.step()
 
         # Save the model
