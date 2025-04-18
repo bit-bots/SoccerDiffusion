@@ -3,7 +3,7 @@ action_context_length: 100
 trajectory_prediction_length: 10
 epochs: 500
 batch_size: 256
-lr: 5.0e-4
+lr: 2.0e-4
 train_denoising_timesteps: 1000
 image_context_length: 10
 imu_context_length: 100

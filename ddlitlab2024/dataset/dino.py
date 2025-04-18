@@ -56,9 +56,12 @@ def process_batch(model, transform, batch_data, device, embedding_dim=384):
 
 def update_embeddings(conn, image_ids, embeddings):
     cursor = conn.cursor()
-    for image_id, emb in zip(image_ids, embeddings):
-        emb_blob = emb.astype(np.float32).tobytes()
-        cursor.execute("UPDATE Image SET embedding = ? WHERE _id = ?", (emb_blob, image_id))
+    # Prepare data as a list of tuples
+    update_data = [
+        (emb.astype(np.float32).tobytes(), image_id)
+        for image_id, emb in zip(image_ids, embeddings)
+    ]
+    cursor.executemany("UPDATE Image SET embedding = ? WHERE _id = ?", update_data)
     conn.commit()
 
 
@@ -73,7 +76,7 @@ def main(db_path, batch_size):
     cursor = conn.cursor()
 
     # Get total number of images without embeddings
-    cursor.execute("SELECT COUNT(*) FROM Image WHERE 1=1")
+    cursor.execute("SELECT COUNT(*) FROM Image WHERE embedding IS NULL")
     total_unprocessed = cursor.fetchone()[0]
 
     # Reuse the cursor to iterate over image data
