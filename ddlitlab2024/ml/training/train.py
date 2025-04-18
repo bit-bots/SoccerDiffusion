@@ -1,3 +1,4 @@
+import random
 import argparse
 from dataclasses import asdict
 from functools import partial
@@ -196,10 +197,17 @@ if __name__ == "__main__":
     scheduler = DDIMScheduler(beta_schedule="squaredcos_cap_v2", clip_sample=False)
     scheduler.config["num_train_timesteps"] = params["train_denoising_timesteps"]
 
+    # Cache the dataset in RAM
+    logger.info("Caching dataset in RAM")
+    cache = list(tqdm(dataloader))
+
     # Training loop
     for epoch in range(params["epochs"]):
+        # Shuffle the dataset at the beginning of each epoch
+        random.shuffle(cache)
+
         # Iterate over the dataset
-        for i, batch in enumerate(pbar := tqdm(dataloader)):
+        for i, batch in enumerate(pbar := tqdm(cache)):
             # Move the data to the device
             batch = {k: v.to(device, non_blocking=True) for k, v in asdict(batch).items() if v is not None}
 

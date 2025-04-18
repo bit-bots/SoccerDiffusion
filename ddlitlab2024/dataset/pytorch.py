@@ -73,7 +73,6 @@ class DDLITLab2024Dataset(Dataset):
         use_action_history: bool = True,
         use_game_state: bool = True,
         use_robot_type: bool = False,
-        use_cache: bool = True,
     ):
         # Initialize the database connection
         self.db_connection: sqlite3.Connection = db_connection if db_connection else connect_to_db()
@@ -98,10 +97,6 @@ class DDLITLab2024Dataset(Dataset):
         self.use_action_history = use_action_history
         self.use_game_state = use_game_state
         self.use_robot_type = use_robot_type
-
-        # Memory cache for the dataset
-        self.use_cache = use_cache
-        self.cache = {}
 
         # Print out metadata
         cursor = self.db_connection.cursor()
@@ -331,10 +326,6 @@ class DDLITLab2024Dataset(Dataset):
         return torch.tensor(robot_type_id)
 
     def __getitem__(self, idx: int) -> Result:
-        # Check if the index is in the cache
-        if idx in self.cache:
-            return self.cache[idx]
-
         # Find the recording that contains the sample
         for start_sample, end_sample, recording_id in self.sample_boundaries:
             if idx >= start_sample and idx < end_sample:
@@ -424,7 +415,7 @@ class DDLITLab2024Dataset(Dataset):
             robot_type = None
 
         # Make a result object
-        result = self.Result(
+        return self.Result(
             joint_command=joint_command,
             joint_command_history=joint_command_history,
             joint_state=joint_state,
@@ -434,11 +425,6 @@ class DDLITLab2024Dataset(Dataset):
             game_state=game_state,
             robot_type=robot_type,
         )
-
-        # Cache the result if necessary
-        if self.use_cache:
-            self.cache[idx] = result
-        return result
 
     @staticmethod
     def collate_fn(batch: Iterable[Result]) -> Result:
