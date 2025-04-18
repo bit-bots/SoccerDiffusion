@@ -27,10 +27,12 @@ def get_transform():
 @torch.no_grad()
 def extract_cls_embeddings(model, batch_tensor, device='cuda'):
     batch_tensor = batch_tensor.to(device)
+    print("🧠 Encoding on GPU...")
     outputs = model.forward_features(batch_tensor)
     return outputs['x_norm_clstoken'].cpu().numpy()  # [B, D]
 
 def fetch_image_batch(cursor, batch_size):
+    print("📥 Fetching image batch from database...")
     return cursor.fetchmany(batch_size)
 
 def decode_image(image_blob):
@@ -39,7 +41,7 @@ def decode_image(image_blob):
     return pil_img
 
 
-def process_batch(model, transform, batch_data, device, embedding_dim=384):
+def process_batch(model, transform, batch_data, device):
     ids = []
     tensors = []
 
@@ -54,20 +56,9 @@ def process_batch(model, transform, batch_data, device, embedding_dim=384):
     return ids, embeddings
 
 
-def update_embeddings(conn, image_ids, embeddings):
-    cursor = conn.cursor()
-    # Prepare data as a list of tuples
-    update_data = [
-        (emb.astype(np.float32).tobytes(), image_id)
-        for image_id, emb in zip(image_ids, embeddings)
-    ]
-    cursor.executemany("UPDATE Image SET embedding = ? WHERE _id = ?", update_data)
-    conn.commit()
-
-
 def main(db_path, batch_size):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f"Using device: {device}")
+    print(f"🚀 Using device: {device}")
 
     model = load_dino_model(device)
     transform = get_transform()
@@ -79,8 +70,10 @@ def main(db_path, batch_size):
     cursor.execute("SELECT COUNT(*) FROM Image WHERE embedding IS NULL")
     total_unprocessed = cursor.fetchone()[0]
 
-    # Reuse the cursor to iterate over image data
     cursor.execute("SELECT _id, data FROM Image WHERE embedding IS NULL")
+
+    all_image_ids = []
+    all_embeddings = []
 
     pbar = tqdm(total=total_unprocessed, desc="Embedding images")
 
@@ -90,13 +83,30 @@ def main(db_path, batch_size):
             break
 
         image_ids, embeddings = process_batch(model, transform, batch_data, device)
-        update_embeddings(conn, image_ids, embeddings)
+        all_image_ids.extend(image_ids)
+        all_embeddings.extend(embeddings)
         pbar.update(len(image_ids))
 
     pbar.close()
+
+    print("💾 Storing embeddings in database...")
+    update_embeddings_bulk(conn, all_image_ids, all_embeddings)
+
     conn.close()
     print("✅ Done: all images processed.")
 
+
+def update_embeddings_bulk(conn, image_ids, embeddings):
+    cursor = conn.cursor()
+    print("💾 Preparing data for bulk update...")
+    data = [
+        (np.array(emb, dtype=np.float32).tobytes(), image_id)
+        for image_id, emb in zip(image_ids, embeddings)
+    ]
+    print("📤 Executing bulk update...")
+    cursor.executemany("UPDATE Image SET embedding = ? WHERE _id = ?", data)
+    conn.commit()
+    print("✅ Embeddings updated in database.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Embed DINOv2 CLS tokens into a SQLite database.")
