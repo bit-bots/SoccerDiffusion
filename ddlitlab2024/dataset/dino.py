@@ -27,12 +27,10 @@ def get_transform():
 @torch.no_grad()
 def extract_cls_embeddings(model, batch_tensor, device='cuda'):
     batch_tensor = batch_tensor.to(device)
-    print("🧠 Encoding on GPU...")
     outputs = model.forward_features(batch_tensor)
     return outputs['x_norm_clstoken'].cpu().numpy()  # [B, D]
 
 def fetch_image_batch(cursor, batch_size):
-    print("📥 Fetching image batch from database...")
     return cursor.fetchmany(batch_size)
 
 def decode_image(image_blob):
@@ -67,9 +65,11 @@ def main(db_path, batch_size):
     cursor = conn.cursor()
 
     # Get total number of images without embeddings
+    print("🔍 Counting images without embeddings...")
     cursor.execute("SELECT COUNT(*) FROM Image WHERE embedding IS NULL")
     total_unprocessed = cursor.fetchone()[0]
 
+    print("🧠 Encoding on GPU...")
     cursor.execute("SELECT _id, data FROM Image WHERE embedding IS NULL")
 
     all_image_ids = []
