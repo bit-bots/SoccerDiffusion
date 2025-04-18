@@ -66,11 +66,11 @@ def main(db_path, batch_size):
 
     # Get total number of images without embeddings
     print("🔍 Counting images without embeddings...")
-    cursor.execute("SELECT COUNT(*) FROM Image WHERE embedding IS NULL")
+    cursor.execute("SELECT COUNT(*) FROM Image")
     total_unprocessed = cursor.fetchone()[0]
 
     print("🧠 Encoding on GPU...")
-    cursor.execute("SELECT _id, data FROM Image WHERE embedding IS NULL")
+    cursor.execute("SELECT _id, data FROM Image")
 
     all_image_ids = []
     all_embeddings = []
