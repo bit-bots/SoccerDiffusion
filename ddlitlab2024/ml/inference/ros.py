@@ -8,6 +8,7 @@ import numpy as np
 import rclpy
 import torch
 import torch.nn.functional as F  # noqa
+import transforms3d
 from bitbots_tf_buffer import Buffer
 from cv_bridge import CvBridge
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
@@ -35,7 +36,7 @@ from ddlitlab2024.utils.utils import quats_to_5d
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 ROBOT_TYPES = ["NAO6", "Wolfgang-OP"]
-ROBOT = ROBOT_TYPES[1]
+ROBOT = ROBOT_TYPES[0]
 
 
 class Inference(Node):
@@ -49,9 +50,9 @@ class Inference(Node):
             [rclpy.parameter.Parameter("use_sim_time", rclpy.Parameter.Type.BOOL, True)],
         )
 
-        self.reconstruct_imu = True
+        self.reconstruct_imu = False
         checkpoint_path = (
-            "../training/bh_03.pth"
+            "../training/bh_04.pth"
             # "../training/trajectory_transformer_model_500_epoch_xmas_hyp.pth"
         )
         self.inference_denosing_timesteps = 30
@@ -112,12 +113,12 @@ class Inference(Node):
 
         # Add default values to the buffers
         self.image_embeddings = [
-            torch.zeros(
-                3, self.hyper_params.get("image_resolution", 480), self.hyper_params.get("image_resolution", 480)
+            torch.rand(
+                (3, self.hyper_params.get("image_resolution", 480), self.hyper_params.get("image_resolution", 480))
             )
         ] * self.hyper_params["image_context_length"]
         self.imu_data = [
-            torch.zeros(
+            torch.rand(
                 5
                 if IMUEncoder.OrientationEmbeddingMethod(self.hyper_params["imu_orientation_embedding_method"])
                 == IMUEncoder.OrientationEmbeddingMethod.FIVE_DIM
@@ -127,7 +128,7 @@ class Inference(Node):
         self.joint_state_data = [torch.zeros(len(self.joint_names))] * self.hyper_params[
             "joint_state_context_length"
         ]
-        self.joint_command_data = [torch.zeros(self.hyper_params["num_joints"])] * self.hyper_params[
+        self.joint_command_data = [torch.rand(self.hyper_params["num_joints"])] * self.hyper_params[
             "action_context_length"
         ]
 
@@ -291,6 +292,12 @@ class Inference(Node):
                     imu_transform.orientation.w,
                 ]
 
+                # Remove yaw from the quaternion using the transforms 3d
+                euler = transforms3d.euler.quat2euler(quat)
+                quat = transforms3d.euler.euler2quat(
+                        euler[0], euler[1], 0
+                    )
+
                 # Convert the quaternion to a 5D representation if needed
                 if (
                     IMUEncoder.OrientationEmbeddingMethod(self.hyper_params["imu_orientation_embedding_method"])
@@ -378,7 +385,7 @@ class Inference(Node):
         trajectory_msg.points = []
         for i in range(self.hyper_params["trajectory_prediction_length"]):
             point = JointTrajectoryPoint()
-            point.positions = trajectory[0, i, filtered_joint_idx].cpu().numpy() - np.pi
+            point.positions = trajectory[0, i, self.joint_idx].cpu().numpy() - np.pi
             point.time_from_start = Duration(nanoseconds=int(1e9 / self.sample_rate * i)).to_msg()
             point.velocities = [-1.0] * len(self.joint_names)
             point.accelerations = [-1.0] * len(self.joint_names)
