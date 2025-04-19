@@ -51,9 +51,9 @@ class Inference(Node):
             [rclpy.parameter.Parameter("use_sim_time", rclpy.Parameter.Type.BOOL, True)],
         )
 
-        self.reconstruct_imu = False
+        self.reconstruct_imu = True
         checkpoint_path = (
-            "/home/florian/ddlitlab/ddlitlab_repo/ddlitlab2024/ml/training/dino_test.pth"
+            "/home/florian/ddlitlab/ddlitlab_repo/ddlitlab2024/ml/training/dino_test_sim.pth"
             # "/srv/ssd_nvm/projects/ddlitlab2024/checkpoints/trajectory_transformer_model_go_distill.pth"
             )
         self.inference_denosing_timesteps = 30
@@ -244,7 +244,7 @@ class Inference(Node):
                 # Embed the image
                 emb = torch.tensor(extract_cls_embeddings(self.dino_model, img.unsqueeze(0), device)[0])
 
-                self.image_embeddings.append(emb) #torch.rand(384))# emb)
+                self.image_embeddings.append(emb)
         self.image_embeddings = self.image_embeddings[-self.hyper_params["image_context_length"] :]
 
     def update_buffers(self):
@@ -316,8 +316,7 @@ class Inference(Node):
                     torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device) + 3 * np.pi
                 )
                 % (2 * np.pi),  # torch.stack(list(self.joint_command_data), dim=0).unsqueeze(0).to(device),
-                # "game_state": torch.tensor([int(self.latest_robot_state)]).to(device),
-                "game_state": torch.zeros(1, dtype=torch.long).to(device),
+                "game_state": torch.tensor([int(self.latest_robot_state)]).to(device),
             }
             if self.hyper_params.get("use_robot_type", False):
                 batch["robot_type"] = torch.zeros(1, dtype=torch.long).to(device) + ROBOT_TYPES.index(ROBOT)
@@ -335,31 +334,32 @@ class Inference(Node):
 
         start_ros_time = self.get_clock().now()
 
-        ## Perform the embedding of the conditioning
-        with torch.no_grad():
-            embedded_input = self.model.encode_input_data(batch)
-
-        # Denoise the trajectory
-        start = time.time()
-
-        if self.hyper_params.get("distilled_decoder", False):
-            # Directly predict the trajectory based on the noise
+        with torch.autocast("cuda"):
+            ## Perform the embedding of the conditioning
             with torch.no_grad():
-                trajectory = self.model.forward_with_context(
-                    embedded_input, trajectory, torch.tensor([0], device=device)
-                )
-        else:
-            # Perform the denoising process
-            self.scheduler.set_timesteps(self.inference_denosing_timesteps)
-            for t in self.scheduler.timesteps:
-                with torch.no_grad():
-                    # Predict the noise residual
-                    noise_pred = self.model.forward_with_context(
-                        embedded_input, trajectory, torch.tensor([t], device=device)
-                    )
+                embedded_input = self.model.encode_input_data(batch)
 
-                    # Update the trajectory based on the predicted noise and the current step of the denoising process
-                    trajectory = self.scheduler.step(noise_pred, t, trajectory).prev_sample
+            # Denoise the trajectory
+            start = time.time()
+
+            if self.hyper_params.get("distilled_decoder", False):
+                # Directly predict the trajectory based on the noise
+                with torch.no_grad():
+                    trajectory = self.model.forward_with_context(
+                        embedded_input, trajectory, torch.tensor([0], device=device)
+                    )
+            else:
+                # Perform the denoising process
+                self.scheduler.set_timesteps(self.inference_denosing_timesteps)
+                for t in self.scheduler.timesteps:
+                    with torch.no_grad():
+                        # Predict the noise residual
+                        noise_pred = self.model.forward_with_context(
+                            embedded_input, trajectory, torch.tensor([t], device=device)
+                        )
+
+                        # Update the trajectory based on the predicted noise and the current step of the denoising process
+                        trajectory = self.scheduler.step(noise_pred, t, trajectory).prev_sample
 
         # Undo the normalization
         trajectory = self.normalizer.denormalize(trajectory)
