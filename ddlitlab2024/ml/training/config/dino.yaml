@@ -1,6 +1,6 @@
 hidden_dim: 1024
 action_context_length: 100
-trajectory_prediction_length: 10
+trajectory_prediction_length: 50
 epochs: 500
 batch_size: 256
 lr: 2.0e-4
