@@ -124,7 +124,7 @@ if __name__ == "__main__":
     model = End2EndDiffusionTransformer(
         num_joints=params["num_joints"],
         hidden_dim=params["hidden_dim"],
-        use_action_history=params["use_action_history"],
+        use_action_history=False,
         num_action_history_encoder_layers=params["num_action_history_encoder_layers"],
         max_action_context_length=params["action_context_length"],
         use_imu=params["use_imu"],
@@ -213,6 +213,12 @@ if __name__ == "__main__":
 
             # Extract the target actions
             joint_targets = batch["joint_command"]
+
+            # Extract the joint command history
+            joint_command_history = batch["joint_command_history"]
+
+            # Concatenate the joint command history and the target actions to do a joint denoising
+            joint_targets = torch.cat((joint_command_history, joint_targets), dim=1)
 
             # Normalize the target actions
             joint_targets = normalizer.normalize(joint_targets)

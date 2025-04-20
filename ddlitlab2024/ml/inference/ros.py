@@ -369,15 +369,6 @@ class Inference(Node):
             self.joint_command_data.append(state.cpu() - np.pi)
         self.joint_command_data = self.joint_command_data[-self.hyper_params["action_context_length"] :]
 
-        # Flip all the signs on the right side (joint name starts with R)
-        # for i, joint_name in enumerate(filtered_joint_names):
-        #     if joint_name.startswith("R"):
-        #         trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
-
-        #     # Invert the hip yaw joint
-        #     if joint_name.endswith("HipYaw"):
-        #         trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
-
         # Publish the trajectory
         trajectory_msg = JointTrajectory()
         trajectory_msg.header.stamp = Time.to_msg(start_ros_time)
