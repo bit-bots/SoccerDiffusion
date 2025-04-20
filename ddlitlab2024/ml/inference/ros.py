@@ -53,10 +53,10 @@ class Inference(Node):
 
         self.reconstruct_imu = True
         checkpoint_path = (
-            "/home/florian/ddlitlab/ddlitlab_repo/ddlitlab2024/ml/training/dino_test_sim.pth"
+            "/home/florian/ddlitlab/ddlitlab_repo/ddlitlab2024/ml/training/dino_test.pth"
             # "/srv/ssd_nvm/projects/ddlitlab2024/checkpoints/trajectory_transformer_model_go_distill.pth"
             )
-        self.inference_denosing_timesteps = 30
+        self.inference_denosing_timesteps = 15
 
         # Params
         self.sample_rate = DEFAULT_RESAMPLE_RATE_HZ
@@ -114,12 +114,12 @@ class Inference(Node):
 
         # Add default values to the buffers
         self.image_embeddings = [
-            torch.zeros(
+            torch.rand(
                 384
             )
         ] * self.hyper_params["image_context_length"]
         self.imu_data = [
-            torch.zeros(
+            torch.rand(
                 5
                 if IMUEncoder.OrientationEmbeddingMethod(self.hyper_params["imu_orientation_embedding_method"])
                 == IMUEncoder.OrientationEmbeddingMethod.FIVE_DIM
@@ -339,6 +339,17 @@ class Inference(Node):
             with torch.no_grad():
                 embedded_input = self.model.encode_input_data(batch)
 
+                # Embed input data without image_data and imu_data
+                uncond_embedded_input = self.model.encode_input_data(
+                    {
+                        "image_data": torch.randn_like(batch["image_data"]),
+                        "rotation": torch.zeros_like(batch["rotation"]),
+                        "game_state":batch["game_state"],
+                        "joint_command_history": batch["joint_command_history"],
+                    }
+                )
+
+
             # Denoise the trajectory
             start = time.time()
 
@@ -351,15 +362,30 @@ class Inference(Node):
             else:
                 # Perform the denoising process
                 self.scheduler.set_timesteps(self.inference_denosing_timesteps)
-                for t in self.scheduler.timesteps:
+                for i, t in enumerate(self.scheduler.timesteps):
                     with torch.no_grad():
                         # Predict the noise residual
                         noise_pred = self.model.forward_with_context(
                             embedded_input, trajectory, torch.tensor([t], device=device)
                         )
 
+                        # Denoise unconditioned trajectory
+                        uncond_noise_pred = self.model.forward_with_context(
+                            uncond_embedded_input, trajectory, torch.tensor([t], device=device)
+                        )
+
                         # Update the trajectory based on the predicted noise and the current step of the denoising process
-                        trajectory = self.scheduler.step(noise_pred, t, trajectory).prev_sample
+                        trajectory_cond = self.scheduler.step(noise_pred, t, trajectory).prev_sample
+                        trajectory_uncond = self.scheduler.step(uncond_noise_pred, t, trajectory).prev_sample
+
+                        # Apply the classifier-free guidance
+                        if i < len(self.scheduler.timesteps) - 1:
+                            trajectory = trajectory_cond + 1 * (
+                                trajectory_cond - trajectory_uncond
+                            )
+                        else:
+                            trajectory = trajectory_cond
+
 
         # Undo the normalization
         trajectory = self.normalizer.denormalize(trajectory)
@@ -368,15 +394,6 @@ class Inference(Node):
         for state in trajectory[0]:
             self.joint_command_data.append(state.cpu() - np.pi)
         self.joint_command_data = self.joint_command_data[-self.hyper_params["action_context_length"] :]
-
-        # Flip all the signs on the right side (joint name starts with R)
-        # for i, joint_name in enumerate(filtered_joint_names):
-        #     if joint_name.startswith("R"):
-        #         trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
-
-        #     # Invert the hip yaw joint
-        #     if joint_name.endswith("HipYaw"):
-        #         trajectory[0, :, filtered_joint_idx[i]] = (-trajectory[0, :, filtered_joint_idx[i]]) % (2 * np.pi)
 
         # Publish the trajectory
         trajectory_msg = JointTrajectory()
