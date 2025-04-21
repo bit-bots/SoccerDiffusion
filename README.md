@@ -3,8 +3,7 @@
 <button name="button" onclick="https://data.bit-bots.de/soccer_diffusion_dataset.sqlite3">🗃️ dataset</button>
 
 ## Walking
-<video width="100%" controls>
-  <source src="assets/walking.mp4" type="video/mp4">
+<video width="100%" controls data-src="assets/walking.mp4" loop autoplay>
 </video>
 
 ## Fall and Standup
