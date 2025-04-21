@@ -1,3 +1,3 @@
 theme: jekyll-theme-minimal
 
-![image](assets/architevture.png)
+![image](assets/architecture.png)
