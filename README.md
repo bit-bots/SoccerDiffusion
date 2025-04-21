@@ -42,7 +42,7 @@
 </video>
 
 ## Fall and Standup
-<!--![image](assets/get_up_fall_back.mp4)
+<video width="100%" src="assets/get_up_fall_back.mp4" controls muted loop autoplay playsinline>
 ![image](assets/get_up_fall_right.mp4)
 -->
 
