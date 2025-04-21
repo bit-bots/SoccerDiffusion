@@ -1,4 +1,4 @@
 remote_theme: pages-themes/slate@v0.2.0
 plugins:
 - jekyll-remote-theme # add this line to the plugins list if you already have one
-title: "SoccerDiffusion: \n End-to-end humanoid robot soccer"
+title: "SoccerDiffusion: Toward Learning End-to-End Humanoid Robot Soccer from Gameplay Recordings"
