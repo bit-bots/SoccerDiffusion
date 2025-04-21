@@ -42,8 +42,9 @@
 </video>
 
 ## Fall and Standup
-![image](assets/get_up_fall_back.mp4)
+<!--![image](assets/get_up_fall_back.mp4)
 ![image](assets/get_up_fall_right.mp4)
+-->
 
 ## Architecture
 ![image](assets/architecture.png)
