@@ -1,8 +1,11 @@
-[📄 paper soon..]()
+[📄 paper soon..]() [💻 code](https://github.com/bit-bots/SoccerDiffusion) [🗃️ dataset](https://data.bit-bots.de/soccer_diffusion_dataset.sqlite3)
 
-[💻 code](https://github.com/bit-bots/SoccerDiffusion)
+## Walking
 
-[🗃️ dataset](https://data.bit-bots.de/soccer_diffusion_dataset.sqlite3)
 
+## Fall and Standup
+
+
+## Architecture
 ![image](assets/architecture.png)
 
