@@ -38,7 +38,7 @@
 
 
 ## Walking
-<video width="100%" data-src="assets/walking.mp4" controls muted loop autoplay playsinline>
+<video width="100%" src="assets/walking.mp4" controls muted loop autoplay playsinline>
 </video>
 
 ## Fall and Standup
