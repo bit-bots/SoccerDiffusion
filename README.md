@@ -38,7 +38,7 @@
 
 
 ## Walking
-<video width="100%" src="https://github.com/bit-bots/SoccerDiffusion/raw/refs/heads/gh-page/assets/walking.mp4" controls muted loop autoplay playsinline>
+<video width="100%" src="assets/walking.mp4" controls muted loop autoplay playsinline>
 </video>
 
 ## Fall and Standup
