@@ -36,16 +36,19 @@
   ">🗃️ Dataset</a>
 </p>
 
-
 ## Walking
+
 <video width="100%" src="assets/walk.mp4" controls muted loop autoplay playsinline>
 </video>
 
 ## Fall and Standup
-<video width="100%" src="assets/get_up_fall_back.mp4" controls muted loop autoplay playsinline>
-<video width="100%" src="assets/get_up_fall_right.mp4" controls muted loop autoplay playsinline>
-<video width="100%" src="assets/get_up_fall_front.mp4" controls muted loop autoplay playsinline>
+
+<video width="100%" src="assets/get_up_fall_back.mp4" controls muted loop autoplay playsinline ></video>
+
+<video width="100%" src="assets/get_up_fall_right.mp4" controls muted loop autoplay playsinline ></video>
+
+<video width="100%" src="assets/get_up_fall_front.mp4" controls muted loop autoplay playsinline ></video>
 
 ## Architecture
-![image](assets/architecture.png)
 
+![image](architecture.png)
