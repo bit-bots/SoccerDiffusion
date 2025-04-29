@@ -1,39 +1,41 @@
+> **Florian Vahl**, **Jörn Griepenburg**, **Jan Gutsche**, **Jasper Güldenstein**, and **Jianwei Zhang**
+>
+> *University of Hamburg, Germany*
+
 <p align="center">
-  <a href="#" style="
-    display: inline-block;
-    padding: 12px 24px;
-    margin: 6px;
-    font-size: 18px;
-    font-weight: bold;
-    color: white;
-    background-color: #6c757d;
-    border-radius: 8px;
-    text-decoration: none;
-  ">📄 Paper</a>
-
-  <a href="https://github.com/bit-bots/SoccerDiffusion" style="
-    display: inline-block;
-    padding: 12px 24px;
-    margin: 6px;
-    font-size: 18px;
-    font-weight: bold;
-    color: white;
-    background-color: #007bff;
-    border-radius: 8px;
-    text-decoration: none;
-  ">💻 Code</a>
-
-  <a href="https://data.bit-bots.de/SoccerDiffusion/dataset/robocup_2024_german_open_2025.sqlite3.gz" style="
-    display: inline-block;
-    padding: 12px 24px;
-    margin: 6px;
-    font-size: 18px;
-    font-weight: bold;
-    color: white;
-    background-color: #28a745;
-    border-radius: 8px;
-    text-decoration: none;
-  ">🗃️ Dataset</a>
+    <a href="#" aria-label="Download the paper" title="Download the paper" style="
+        display: inline-block;
+        padding: 12px 24px;
+        margin: 6px;
+        font-size: 18px;
+        font-weight: bold;
+        color: white;
+        background-color: #6c757d;
+        border-radius: 8px;
+        text-decoration: none;
+    ">📄 Paper</a>
+    <a href="https://github.com/bit-bots/SoccerDiffusion" aria-label="View the source Code on GitHub.com" title="View the source Code on GitHub.com" style="
+        display: inline-block;
+        padding: 12px 24px;
+        margin: 6px;
+        font-size: 18px;
+        font-weight: bold;
+        color: white;
+        background-color: #007bff;
+        border-radius: 8px;
+        text-decoration: none;
+    ">💻 Code</a>
+    <a href="#dataset" aria-label="Download the dataset" title="Download the dataset" style="
+        display: inline-block;
+        padding: 12px 24px;
+        margin: 6px;
+        font-size: 18px;
+        font-weight: bold;
+        color: white;
+        background-color: #28a745;
+        border-radius: 8px;
+        text-decoration: none;
+    ">🗃️ Dataset</a>
 </p>
 
 ## Abstract
@@ -46,8 +48,7 @@ Although high-level tactical behavior remains limited, this work provides a robu
 
 ## Walking
 
-<video width="100%" src="assets/walk.mp4" controls muted loop autoplay playsinline>
-</video>
+<video width="100%" src="assets/walk.mp4" controls muted loop autoplay playsinline></video>
 
 ## Fall and Standup
 
@@ -60,6 +61,28 @@ Although high-level tactical behavior remains limited, this work provides a robu
 ## Architecture
 
 ![image](architecture.png)
+
+## Dataset
+
+The dataset file is compressed using gzip.
+You can get the dateset in two ways:
+
+1. **Download and immediately uncompress dataset** with:
+
+    ```shell
+    wget https://data.bit-bots.de/SoccerDiffusion/dataset/robocup_2024_german_open_2025.sqlite3.gz -O - | gzip -d > robocup_2024_german_open_2025.sqlite3
+    ```
+
+2. **Download the compressed dataset, then uncompress**: [robocup_2024_german_open_2025.sqlite3.gz](https://data.bit-bots.de/SoccerDiffusion/dataset/robocup_2024_german_open_2025.sqlite3.gz) and uncompress file manually with:
+
+    ```shell
+    gzip -d robocup_2024_german_open_2025.sqlite3.gz
+    ```
+
+| File                                     | Size   | SHA256SUM                                                        | MD5SUM                              |
+|------------------------------------------|--------|------------------------------------------------------------------|----------------------------------|
+| robocup_2024_german_open_2025.sqlite3.gz | 266 GB | 21ba0fe6ff39298f678bb59b2f85e6cfa5351d77d0695f73d9f4bb69a2427d7c | ecd6b5a5adeef7a688e281afe7fa91c8 |
+| robocup_2024_german_open_2025.sqlite3    | 340 GB | c39d10b9c5533f8d04a2c58e3d522b2134cda7fe64e9eabca9363c9ebfd2b1e4 | de6997b4f18e701e3d7730e3e1151ae2 |
 
 ## Acknowledgements
 
