@@ -23,7 +23,7 @@
     text-decoration: none;
   ">💻 Code</a>
 
-  <a href="https://data.bit-bots.de/soccer_diffusion_dataset.sqlite3" style="
+  <a href="https://data.bit-bots.de/SoccerDiffusion/dataset/robocup_2024_german_open_2025.sqlite3.gz" style="
     display: inline-block;
     padding: 12px 24px;
     margin: 6px;
