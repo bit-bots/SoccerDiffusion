@@ -3,7 +3,7 @@
 > *University of Hamburg, Germany*
 
 <p align="center">
-    <a href="#" aria-label="Download the paper" title="Download the paper" style="
+    <a href="https://arxiv.org/pdf/2504.20808" aria-label="Download the paper" title="Download the paper" style="
         display: inline-block;
         padding: 12px 24px;
         margin: 6px;
