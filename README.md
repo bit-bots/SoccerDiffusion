@@ -83,18 +83,26 @@ You can get the dateset in two ways:
 **File:** `robocup_2024_german_open_2025.sqlite3.gz`  
 **Size:** 266 GB  
 **SHA256SUM:**  
-`21ba0fe6ff39298f678bb59b2f85e6cfa5351d77d0695f73d9f4bb69a2427d7c`  
+```
+21ba0fe6ff39298f678bb59b2f85e6cfa5351d77d0695f73d9f4bb69a2427d7c
+```  
 **MD5SUM:**  
-`ecd6b5a5adeef7a688e281afe7fa91c8`
+```
+ecd6b5a5adeef7a688e281afe7fa91c8
+```
 
 ---
 
 **File:** `robocup_2024_german_open_2025.sqlite3`  
 **Size:** 340 GB  
 **SHA256SUM:**  
-`c39d10b9c5533f8d04a2c58e3d522b2134cda7fe64e9eabca9363c9ebfd2b1e4`  
+```
+c39d10b9c5533f8d04a2c58e3d522b2134cda7fe64e9eabca9363c9ebfd2b1e4
+```  
 **MD5SUM:**  
-`de6997b4f18e701e3d7730e3e1151ae2`
+```
+de6997b4f18e701e3d7730e3e1151ae2
+```
 
 ---
 
