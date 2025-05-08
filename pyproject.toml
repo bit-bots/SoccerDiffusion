@@ -3,10 +3,10 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "ddlitlab2024"
+name = "soccer_diffusion"
 version = "0.0.1"
 readme = "README.md"
-repository = "https://github.com/bit-bots/ddlitlab2024"
+repository = "https://github.com/bit-bots/SoccerDiffusion"
 authors = ["Florian Vahl", "Jan Gutsche", "Joern Griepenburg"]
 description = ""
 
@@ -60,4 +60,4 @@ line-length = 120
 select = ["F", "E", "B", "W", "I", "N", "UP"]
 
 [tool.poetry.scripts]
-cli = "ddlitlab2024.dataset.cli.run:main"
+cli = "soccer_diffusion.dataset.cli.run:main"
