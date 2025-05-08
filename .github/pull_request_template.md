@@ -10,4 +10,4 @@
 
 - [ ] Write documentation
 - [ ] Create issues for future work
-- [ ] This PR is on our `DDLitLab` project board
+- [ ] This PR is on our [SoccerDiffusion](https://github.com/orgs/bit-bots/projects/26) project board

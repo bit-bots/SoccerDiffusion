@@ -4,7 +4,7 @@
       "type": "debugpy",
       "request": "launch",
       "name": "Launch Bit-Bots import",
-      "program": "${workspaceFolder}/ddlitlab2024/dataset/cli/run.py",
+      "program": "${workspaceFolder}/soccer_diffusion/dataset/cli/run.py",
       "args": [
         "import",
         "bit-bots",
@@ -15,7 +15,7 @@
       "type": "debugpy",
       "request": "launch",
       "name": "Launch B-Human import",
-      "program": "${workspaceFolder}/ddlitlab2024/dataset/cli/run.py",
+      "program": "${workspaceFolder}/soccer_diffusion/dataset/cli/run.py",
       "args": [
         "import",
         "b-human",

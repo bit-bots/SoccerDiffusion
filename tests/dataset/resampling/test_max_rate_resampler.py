@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from ddlitlab2024.dataset.imports.data import InputData
-from ddlitlab2024.dataset.resampling.max_rate_resampler import MaxRateResampler
+from soccer_diffusion.dataset.imports.data import InputData
+from soccer_diffusion.dataset.resampling.max_rate_resampler import MaxRateResampler
 
 MAX_SAMPLE_RATE_HZ = 50
 

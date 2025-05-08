@@ -31,7 +31,7 @@ jobs:
 
       - name: Setup DB with alembic migrations
         run: |
-          cd ./ddlitlab2024/dataset
+          cd ./soccer_diffusion/dataset
           poetry run alembic upgrade head
 
       - name: Populate DB with dummy data

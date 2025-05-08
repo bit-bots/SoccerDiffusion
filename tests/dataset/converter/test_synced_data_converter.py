@@ -3,11 +3,11 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from ddlitlab2024.dataset.converters.synced_data_converter import SyncedDataConverter
-from ddlitlab2024.dataset.imports.data import InputData
-from ddlitlab2024.dataset.models import Recording
-from ddlitlab2024.dataset.resampling.previous_interpolation_resampler import PreviousInterpolationResampler
-from ddlitlab2024.dataset.resampling.resampler import Sample
+from soccer_diffusion.dataset.converters.synced_data_converter import SyncedDataConverter
+from soccer_diffusion.dataset.imports.data import InputData
+from soccer_diffusion.dataset.models import Recording
+from soccer_diffusion.dataset.resampling.previous_interpolation_resampler import PreviousInterpolationResampler
+from soccer_diffusion.dataset.resampling.resampler import Sample
 
 
 def test_all_synced_data_required(converter, recording, imu_msg, joint_position_msg, joint_command_msg):
