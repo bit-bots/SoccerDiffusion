@@ -36,6 +36,7 @@ torchvision = "^0.21.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.8.0"
+ipykernel = "^6.29.5"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.3"
