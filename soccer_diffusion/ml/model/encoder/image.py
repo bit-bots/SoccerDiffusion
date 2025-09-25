@@ -6,6 +6,7 @@ from torchvision.models import resnet18, resnet50, swin_s, swin_t
 from torchvision.models.resnet import ResNet18_Weights, ResNet50_Weights
 
 from soccer_diffusion.ml.model.encoder.base import BaseEncoder
+from soccer_diffusion.ml.model.misc import PositionalEncoding
 
 
 class ImageEncoderType(Enum):
@@ -169,6 +170,7 @@ def image_sequence_encoder_factory(
         case SequenceEncoderType.TRANSFORMER:
             return TransformerImageSequenceEncoder(image_encoder, hidden_dim, num_layers, max_seq_len)
         case SequenceEncoderType.NONE:
-            return image_encoder
+            pos_enc = nn.Sequential(image_encoder, PositionalEncoding(hidden_dim, max_seq_len))
+            return pos_enc
         case _:
             raise ValueError(f"Invalid sequence encoder type: {encoder_type}")
