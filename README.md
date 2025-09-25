@@ -1,12 +1,11 @@
-# DDLitLab2024 Project Hamburg Bit-Bots
+# SoccerDiffusion
 
-End-to-end machine learning for soccer-playing robots. We are experimenting with diffusion-models to generate robot motions based on recent sensor measurements.
+> Toward Learning End-to-End Humanoid Robot Soccer from Gameplay Recordings
+
+Find our (preprint) paper and more information about the project on our [website](https://bit-bots.github.io/SoccerDiffusion/).
 
 > [!IMPORTANT]
-> This is still an ongioing research project.
-
-> [!NOTE]
-> This repository contains the source code for our [DDLitLab project](https://www.isa.uni-hamburg.de/ddlitlab.html) [Fußballspielende Roboter: Ende-zu-Ende-KI für Wahrnehmung und Steuerung im RoboCup](https://www.isa.uni-hamburg.de/ddlitlab/data-literacy-studierendenprojekte/vierte-foerderrunde/e2e-robot-soccer.html) for the fourth funding round.
+> This is still an ongoing research project.
 
 ## Getting Started
 
@@ -19,13 +18,13 @@ End-to-end machine learning for soccer-playing robots. We are experimenting with
 1. Download this repo:
 
     ```shell
-    git clone https://github.com/bit-bots/ddlitlab2024.git
+    git clone https://github.com/bit-bots/SoccerDiffusion.git
     ```
 
 2. Go into the downloaded directory:
 
     ```shell
-    cd ddlitlab2024
+    cd soccer_diffusion
     ```
 
 3. Install dependencies using [poetry](https://python-poetry.org/docs/#installation):
@@ -55,3 +54,11 @@ Some tools contained in this repository require additional system-dependencies.
     ```
 
     Then build the Python package as described in [this document](https://docs.b-human.de/master/python-bindings/#local-build).
+
+## Acknowledgements
+
+We gratefully acknowledge funding and support from the project [*Digital and Data Literacy in Teaching Lab (DDLitLab)*](https://www.hcl.uni-hamburg.de/ddlitlab.html) at the University of Hamburg and the [*Stiftung Innovation in der Hochschullehre*](https://stiftung-hochschullehre.de/) foundation.
+We extend our special thanks to the members of the [*Hamburg Bit-Bots*](https://bit-bots.de/) RoboCup team for their continuous support and for providing data and computational resources.
+We also thank the RoboCup teams [*B-Human*](https://b-human.de/) and [*HULKs*](https://hulks.de/) for generously sharing their data for this research.
+Additionally, we are grateful to the [*Technical Aspects of Multimodal Systems (TAMS)*](https://tams.informatik.uni-hamburg.de/) research group at the University of Hamburg for providing computational resources.
+This research was partially funded by the Ministry of Science, Research and Equalities of Hamburg, as well as the German Research Foundation (DFG) and the National Science Foundation of China (NSFC) through the project [*Crossmodal Learning*](https://www.crossmodal-learning.org/home.html) (TRR-169).

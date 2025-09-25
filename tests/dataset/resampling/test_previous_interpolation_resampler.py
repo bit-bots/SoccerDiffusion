@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from ddlitlab2024.dataset.imports.data import InputData
-from ddlitlab2024.dataset.resampling.previous_interpolation_resampler import PreviousInterpolationResampler
+from soccer_diffusion.dataset.imports.data import InputData
+from soccer_diffusion.dataset.resampling.previous_interpolation_resampler import PreviousInterpolationResampler
 
 SAMPLE_RATE_HZ = 50
 

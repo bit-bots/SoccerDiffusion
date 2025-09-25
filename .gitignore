@@ -210,7 +210,7 @@ ENV/
 *.pth
 
 # Wandb Logs
-ddlitlab2024/ml/training/wandb/
+soccer_diffusion/ml/training/wandb/
 
 # Input data
 input/
